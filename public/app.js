@@ -11,6 +11,8 @@ const presetDivider = document.getElementById('presetDivider');
 const presetSelect = document.getElementById('presetSelect');
 const loadPresetBtn = document.getElementById('loadPresetBtn');
 const savePresetBtn = document.getElementById('savePresetBtn');
+const updatePresetBtn = document.getElementById('updatePresetBtn');
+const deletePresetBtn = document.getElementById('deletePresetBtn');
 const exportPresetBtn = document.getElementById('exportPresetBtn');
 const importPresetInput = document.getElementById('importPresetInput');
 
@@ -74,8 +76,16 @@ printBtn.addEventListener('click', () => window.print());
 // Preset Listeners
 savePresetBtn.addEventListener('click', handleSavePreset);
 loadPresetBtn.addEventListener('click', handleLoadPreset);
+updatePresetBtn.addEventListener('click', handleUpdatePreset);
+deletePresetBtn.addEventListener('click', handleDeletePreset);
 exportPresetBtn.addEventListener('click', handleExportPreset);
 importPresetInput.addEventListener('change', handleImportPreset);
+
+presetSelect.addEventListener('change', () => {
+    const hasSelection = presetSelect.value !== '';
+    updatePresetBtn.disabled = !hasSelection;
+    deletePresetBtn.disabled = !hasSelection;
+});
 
 // Styling Listeners
 targetCategory.addEventListener('change', updateControlsToMatchCategory);
@@ -647,7 +657,44 @@ function handleSavePreset() {
 
     populatePresetDropdown();
     presetSelect.value = name.trim();
+
+    // Enable Update/Delete buttons after saving a new valid preset
+    updatePresetBtn.disabled = false;
+    deletePresetBtn.disabled = false;
+
     alert(`Preset "${name.trim()}" saved locally!`);
+}
+
+function handleUpdatePreset() {
+    const selected = presetSelect.value;
+    if (!selected) return;
+
+    if (confirm(`Update preset "${selected}" with current styles?`)) {
+        const presets = getLocalPresets();
+        presets[selected] = JSON.parse(JSON.stringify(categoryStyles));
+        saveLocalPresets(presets);
+        alert(`Preset "${selected}" updated successfully!`);
+    }
+}
+
+function handleDeletePreset() {
+    const selected = presetSelect.value;
+    if (!selected) return;
+
+    if (confirm(`Are you sure you want to delete preset "${selected}"?`)) {
+        const presets = getLocalPresets();
+        delete presets[selected];
+        saveLocalPresets(presets);
+
+        populatePresetDropdown();
+        presetSelect.value = '';
+
+        // Reset disabled states
+        updatePresetBtn.disabled = true;
+        deletePresetBtn.disabled = true;
+
+        alert(`Preset "${selected}" deleted.`);
+    }
 }
 
 function handleLoadPreset() {
@@ -807,7 +854,6 @@ async function handleImportPreset(event) {
 
             loadPresetData(importedData);
 
-            // Ask if they want to save it locally too
             if (confirm("Preset imported successfully! Do you want to save this to your local browser presets?")) {
                 const name = prompt("Enter a name for this preset:");
                 if (name && name.trim() !== '') {
@@ -816,6 +862,8 @@ async function handleImportPreset(event) {
                     saveLocalPresets(presets);
                     populatePresetDropdown();
                     presetSelect.value = name.trim();
+                    updatePresetBtn.disabled = false;
+                    deletePresetBtn.disabled = false;
                 }
             }
 
