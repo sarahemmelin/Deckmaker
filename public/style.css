@@ -1,0 +1,588 @@
+/* =========================================
+   BASE STYLES & VARIABLES
+   ========================================= */
+:root {
+    /* Modern Neutral Theme */
+    --bg-color: #f3f4f6;
+    --sidebar-bg: #ffffff;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --border-color: #e5e7eb;
+
+    /* Interactive Elements */
+    --primary-color: #0f172a;
+    --primary-hover: #334155;
+    --accent-color: #3b82f6;
+    --danger-text: #FF0000;
+
+    /* Layout */
+    --sidebar-width: 320px;
+
+    /* Card Dimensions (Poker Size) */
+    --card-width: 2.5in;
+    --card-height: 3.5in;
+
+    /* Game Card Dynamic Defaults */
+    --dynamic-card-bg: #ffffff;
+    --dynamic-card-bg-image: none;
+    --dynamic-card-bg-size: 100%;
+    --dynamic-card-bg-pos-x: 50%;
+    --dynamic-card-bg-pos-y: 50%;
+    --dynamic-card-overlay: rgba(255, 255, 255, 0);
+    --dynamic-card-text: #111827;
+    --dynamic-card-accent: #1f2937;
+
+    /* Typography Defaults */
+    --dynamic-card-font: 'Inter', sans-serif;
+    --dynamic-card-size: 1rem;
+    --dynamic-card-break: normal;
+    --dynamic-card-hyphens: none;
+    --dynamic-card-buoy-display: flex;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* =========================================
+   APP LAYOUT & SIDEBAR
+   ========================================= */
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    z-index: 10;
+}
+
+.workspace {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #0f172a;
+}
+
+.sidebar-header p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.sidebar-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* File Upload Button */
+.file-upload-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background-color: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.file-upload-label:hover {
+    background-color: #f1f5f9;
+    border-color: var(--accent-color);
+    color: var(--primary-color);
+}
+
+.upload-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.file-input {
+    display: none;
+}
+
+.file-status {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* Styling Controls */
+.styling-section h3 {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.style-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.style-select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--border-color);
+    font-family: inherit;
+    font-size: 0.875rem;
+    width: 120px;
+}
+
+.color-picker-wrapper input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+}
+
+/* Accessibility Checker */
+.a11y-checker {
+    background-color: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.a11y-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.a11y-details {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-left: 1.75rem;
+    /* Indent past the icon */
+}
+
+.a11y-pass .a11y-header {
+    color: #10b981;
+}
+
+/* Emerald 500 */
+.a11y-warn .a11y-header {
+    color: #f59e0b;
+}
+
+/* Amber 500 */
+.a11y-fail .a11y-header {
+    color: #ef4444;
+}
+
+/* Red 500 */
+
+/* Buttons */
+.action-group {
+    margin-top: auto;
+    gap: 0.75rem;
+}
+
+button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.primary-btn:not(:disabled):hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.secondary-btn {
+    background-color: white;
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+}
+
+.secondary-btn:not(:disabled):hover {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+/* =========================================
+   WORKSPACE UI
+   ========================================= */
+.workspace-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.workspace-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.badge {
+    background-color: #e2e8f0;
+    color: #475569;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+/* =========================================
+   VISUAL GAME CARD SPECIFICS
+   ========================================= */
+.game-card {
+    width: var(--card-width);
+    height: var(--card-height);
+    background-color: transparent;
+    color: var(--dynamic-card-text);
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    z-index: 1;
+    /* Establishes stacking context for background layers */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.15in;
+    font-family: var(--dynamic-card-font);
+    font-size: var(--dynamic-card-size);
+    transition: color 0.2s, font-size 0.2s;
+}
+
+/* Texture Layer (Bottom) */
+.card-bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--dynamic-card-bg);
+    /* background-image is handled natively via JS inline styles */
+    background-size: var(--dynamic-card-bg-size);
+    background-position: var(--dynamic-card-bg-pos-x) var(--dynamic-card-bg-pos-y);
+    background-repeat: repeat;
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* Color Overlay Layer (Middle) */
+.card-overlay-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--dynamic-card-overlay);
+    z-index: -1;
+    pointer-events: none;
+    /* Allows clicks to pass through */
+}
+
+/* Type Banner */
+.card-type-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0.08in;
+    background-color: var(--dynamic-card-accent);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid var(--dynamic-card-accent);
+    padding-bottom: 0.05in;
+    margin-bottom: 0.05in;
+    margin-top: 0.05in;
+}
+
+.card-title {
+    font-weight: 800;
+    font-size: 0.8em;
+    /* Relative to --dynamic-card-size */
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    margin: 0;
+}
+
+/* Icons / Badges top right */
+.card-stats {
+    display: flex;
+    gap: 0.04in;
+    align-items: center;
+}
+
+.stat-badge {
+    background: var(--dynamic-card-accent);
+    color: var(--dynamic-card-bg);
+    font-weight: 700;
+    font-size: 0.65em;
+    /* Relative */
+    padding: 0.02in 0.05in;
+    border-radius: 0.125rem;
+    display: flex;
+    align-items: center;
+    gap: 0.02in;
+}
+
+.buoy-badge {
+    display: var(--dynamic-card-buoy-display);
+    width: 0.95in;
+    /* exactly equal fixed size for all cards */
+    height: 0.22in;
+    justify-content: center;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.stat-badge.bio {
+    background: #10b981;
+    color: white;
+}
+
+.card-image-placeholder {
+    height: 1in;
+    background-color: rgba(0, 0, 0, 0.05);
+    /* very light tint of whatever background */
+    border: 1px dashed var(--dynamic-card-accent);
+    margin-bottom: 0.05in;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--dynamic-card-text);
+    opacity: 0.6;
+    font-size: 0.65rem;
+    font-style: italic;
+    cursor: pointer;
+    background-size: cover;
+    background-position: center;
+    transition: opacity 0.2s;
+}
+
+.card-image-placeholder:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.card-image-placeholder.has-image {
+    border: 1px solid var(--dynamic-card-accent);
+    color: transparent;
+    /* hide the 'Click to add illustration' text */
+    text-indent: -9999px;
+}
+
+.card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05in;
+    font-size: 0.65em;
+    /* relative */
+    line-height: 1.4;
+    word-break: var(--dynamic-card-break);
+    hyphens: var(--dynamic-card-hyphens);
+}
+
+.card-red-text {
+    color: var(--danger-text);
+    font-weight: 700;
+}
+
+.card-mechanic {
+    background-color: rgba(0, 0, 0, 0.04);
+    border-left: 2px solid var(--dynamic-card-accent);
+    padding: 0.04in 0.08in;
+    font-size: 0.6rem;
+    font-weight: 500;
+}
+
+.card-flavor {
+    margin-top: auto;
+    font-style: italic;
+    font-size: 0.55rem;
+    opacity: 0.8;
+    border-top: 1px solid var(--border-color);
+    padding-top: 0.05in;
+}
+
+.card-id-footer {
+    position: absolute;
+    bottom: 0.05in;
+    right: 0.05in;
+    font-size: 0.45rem;
+    opacity: 0.5;
+    font-family: monospace;
+}
+
+/* =========================================
+   PRINT STYLES (@media print)
+   ========================================= */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 0;
+        /* Setting margin to 0 removes default browser headers/footers (dates, URLs) */
+    }
+
+    html,
+    body {
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    body {
+        background-color: white !important;
+        padding: 0.2in !important;
+        /* Re-introduce a safe, consistent margin inside the page */
+        margin: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        /* Ensure background colors print correctly */
+    }
+
+    .no-print,
+    .sidebar {
+        display: none !important;
+    }
+
+    .app-layout,
+    .workspace {
+        display: block !important;
+        /* Remove flex from layout to prevent bizarre page breaks */
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .card-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, var(--card-width)) !important;
+        grid-auto-rows: var(--card-height) !important;
+        gap: 0 !important;
+        justify-content: center;
+    }
+
+    .game-card {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        border: 1px dashed #999 !important;
+        /* Dashed cut lines are easier to see for scissors */
+        page-break-inside: avoid;
+        break-inside: avoid;
+        margin: 0.02in;
+        /* Tiny space so cut lines don't perfectly overlap and disappear */
+    }
+}

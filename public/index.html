@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Designer Studio</title>
+    <!-- Modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar Controls (Hidden on Print) -->
+        <aside class="sidebar no-print">
+            <header class="sidebar-header">
+                <h1>Deckmaker</h1>
+                <p>Card Designer Studio</p>
+            </header>
+
+            <div class="control-group">
+                <label for="csvFileInput" class="file-upload-label">
+                    <span class="material-icons upload-icon">folder</span>
+                    Upload CSV Data
+                    <input type="file" id="csvFileInput" accept=".csv" class="file-input">
+                </label>
+                <div id="fileStatus" class="file-status">No file uploaded.</div>
+            </div>
+
+            <hr class="sidebar-divider" />
+
+            <!-- Preset Management -->
+            <div class="control-group preset-section" id="presetSection" style="display: none;">
+                <h3>Preset Management</h3>
+                <div class="style-field">
+                    <label for="presetSelect">Load Local Preset:</label>
+                    <div style="display: flex; gap: 0.5rem; width: 100%;">
+                        <select id="presetSelect" class="style-select" style="flex: 1;">
+                            <option value="">-- Select a Preset --</option>
+                        </select>
+                        <button id="loadPresetBtn" class="secondary-btn"
+                            style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">Load</button>
+                    </div>
+                </div>
+                <div class="style-field"
+                    style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+                    <button id="savePresetBtn" class="primary-btn"
+                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1;">Save As...</button>
+                </div>
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+                <div class="style-field" style="display: flex; gap: 0.5rem;">
+                    <button id="exportPresetBtn" class="secondary-btn"
+                        style="padding: 0.25rem; font-size: 0.8rem; flex: 1;"
+                        title="Export presets to a JSON file">Export JSON</button>
+                    <label for="importPresetInput" class="secondary-btn"
+                        style="padding: 0.25rem; font-size: 0.8rem; flex: 1; text-align: center; cursor: pointer;"
+                        title="Import presets from a JSON file">
+                        Import JSON
+                        <input type="file" id="importPresetInput" accept=".json" style="display: none;">
+                    </label>
+                </div>
+            </div>
+
+            <hr class="sidebar-divider" id="presetDivider" style="display: none;" />
+
+            <!-- Styling Controls -->
+            <div class="control-group styling-section" id="stylingSection" style="display: none;">
+                <h3>Card Styling</h3>
+
+                <div class="style-field">
+                    <label for="targetCategory">Target Category:</label>
+                    <select id="targetCategory" class="style-select">
+                        <option value="all">All Cards</option>
+                        <!-- Options generated dynamically based on Card_Type -->
+                    </select>
+                </div>
+
+                <div class="style-field">
+                    <label for="bgColorPicker">Background Color:</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="bgColorPicker" value="#ffffff">
+                    </div>
+                </div>
+
+                <div class="style-field">
+                    <label for="bgImageUpload">Background Texture:</label>
+                    <div style="display: flex; gap: 0.5rem; width: 100%; align-items: center;">
+                        <input type="file" id="bgImageUpload" accept="image/png, image/jpeg"
+                            style="width: 120px; font-size: 0.75rem;">
+                        <button id="removeBgImageBtn" class="secondary-btn"
+                            style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                            title="Remove background texture">Remove</button>
+                    </div>
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="bgScaleSlider">Texture Scale (%):</label>
+                    <input type="range" id="bgScaleSlider" min="10" max="300" step="1" value="100" style="width: 100%;">
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="bgPosXSlider">Texture Pos X (%):</label>
+                    <input type="range" id="bgPosXSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="bgPosYSlider">Texture Pos Y (%):</label>
+                    <input type="range" id="bgPosYSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
+                </div>
+
+                <div class="style-field">
+                    <label for="overlayColorPicker">Overlay Color:</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="overlayColorPicker" value="#ffffff">
+                    </div>
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="overlayOpacitySlider">Overlay Opacity:</label>
+                    <input type="range" id="overlayOpacitySlider" min="0" max="1" step="0.05" value="0"
+                        style="width: 100%;">
+                </div>
+
+                <div class="style-field">
+                    <label for="textColorPicker">Text Color:</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="textColorPicker" value="#111827">
+                    </div>
+                </div>
+
+                <div class="style-field">
+                    <label for="accentColorPicker">Accent Fill (Icon/Border):</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="accentColorPicker" value="#1f2937">
+                    </div>
+                </div>
+
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+
+                <!-- Accessibility Checker -->
+                <div class="a11y-checker" id="a11yChecker">
+                    <div class="a11y-header">
+                        <span class="material-icons" id="a11yIcon">check_circle</span>
+                        <span id="a11yStatus">Contrast: Excellent</span>
+                    </div>
+                    <div class="a11y-details" id="a11yDetails">
+                        Print contrast ratio: <span id="a11yRatio">12.5:1</span> (Simulated 15% darker)
+                    </div>
+                </div>
+
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+
+                <div class="style-field">
+                    <label for="fontFamilySelect">Font Family:</label>
+                    <select id="fontFamilySelect" class="style-select">
+                        <option value="'Inter', sans-serif">Inter (Modern)</option>
+                        <option value="'Georgia', serif">Georgia (Classic)</option>
+                        <option value="'Courier New', monospace">Courier (Tech)</option>
+                        <option value="'Impact', sans-serif">Impact (Bold)</option>
+                        <option value="'Arial', sans-serif">Arial</option>
+                    </select>
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="fontSizeSlider">Base Font Size:</label>
+                    <input type="range" id="fontSizeSlider" min="0.5" max="1.5" step="0.05" value="1"
+                        style="width: 100%;">
+                </div>
+
+                <div class="style-field">
+                    <label for="wordBreakToggle">Force Word Break:</label>
+                    <input type="checkbox" id="wordBreakToggle">
+                </div>
+
+                <div class="style-field">
+                    <label for="showBuoyancyToggle">Show Buoyancy Badge:</label>
+                    <input type="checkbox" id="showBuoyancyToggle" checked>
+                </div>
+            </div>
+
+            <div class="control-group action-group">
+                <button id="generateBtn" class="primary-btn" disabled>
+                    <span class="material-icons btn-icon">auto_awesome</span> Generate Cards
+                </button>
+                <button id="printBtn" class="secondary-btn" disabled>
+                    <span class="material-icons btn-icon">print</span> Generate Print View
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace: Card Grid -->
+        <main class="workspace">
+            <div class="workspace-header no-print">
+                <h2>Card Preview</h2>
+                <span id="cardCount" class="badge">0 Cards</span>
+            </div>
+
+            <div id="cardGrid" class="card-grid">
+                <!-- Cards will be injected here by app.js -->
+                <div class="empty-state no-print">
+                    <div class="material-icons empty-state-icon" style="font-size: 48px;">description</div>
+                    <h3>Ready to design</h3>
+                    <p>Upload a CSV file exported from Google Sheets to render your cards.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Hidden input for interactive image uploads -->
+    <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
+
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>

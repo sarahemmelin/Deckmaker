@@ -1,0 +1,832 @@
+// --- DOM Selectors ---
+const csvFileInput = document.getElementById('csvFileInput');
+const fileStatus = document.getElementById('fileStatus');
+const generateBtn = document.getElementById('generateBtn');
+const printBtn = document.getElementById('printBtn');
+const cardGrid = document.getElementById('cardGrid');
+const cardCount = document.getElementById('cardCount');
+
+const presetSection = document.getElementById('presetSection');
+const presetDivider = document.getElementById('presetDivider');
+const presetSelect = document.getElementById('presetSelect');
+const loadPresetBtn = document.getElementById('loadPresetBtn');
+const savePresetBtn = document.getElementById('savePresetBtn');
+const exportPresetBtn = document.getElementById('exportPresetBtn');
+const importPresetInput = document.getElementById('importPresetInput');
+
+const stylingSection = document.getElementById('stylingSection');
+// Styling Selectors
+const targetCategory = document.getElementById('targetCategory');
+const bgColorPicker = document.getElementById('bgColorPicker');
+const bgImageUpload = document.getElementById('bgImageUpload');
+const removeBgImageBtn = document.getElementById('removeBgImageBtn');
+const bgScaleSlider = document.getElementById('bgScaleSlider');
+const bgPosXSlider = document.getElementById('bgPosXSlider');
+const bgPosYSlider = document.getElementById('bgPosYSlider');
+const overlayColorPicker = document.getElementById('overlayColorPicker');
+const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
+const textColorPicker = document.getElementById('textColorPicker');
+const accentColorPicker = document.getElementById('accentColorPicker');
+const fontFamilySelect = document.getElementById('fontFamilySelect');
+const fontSizeSlider = document.getElementById('fontSizeSlider');
+const wordBreakToggle = document.getElementById('wordBreakToggle');
+const showBuoyancyToggle = document.getElementById('showBuoyancyToggle');
+
+// Accessibility Checker Selectors
+const a11yChecker = document.getElementById('a11yChecker');
+const a11yIcon = document.getElementById('a11yIcon');
+const a11yStatus = document.getElementById('a11yStatus');
+const a11yRatio = document.getElementById('a11yRatio');
+
+const imageUploadInput = document.getElementById('imageUploadInput');
+
+// --- Global State ---
+let parsedCsvData = [];
+let cardCategories = new Set();
+let cardTitles = new Set();
+let activeImagePlaceholder = null;
+
+// Stores styling state globally. 
+// Format: { "cat_Upgrade": { bg: "#fff", ... }, "card_Experimental Chassis": { bg: ... }, "all": { ... } }
+let categoryStyles = {
+    "all": {
+        bg: "#ffffff",
+        bgImage: "none",
+        bgScale: "100",
+        bgPosX: "50",
+        bgPosY: "50",
+        overlayColor: "#ffffff",
+        overlayOpacity: "0",
+        text: "#111827",
+        accent: "#1f2937",
+        font: "'Inter', sans-serif",
+        size: "1",
+        wordBreak: false,
+        showBuoy: true
+    }
+};
+
+// --- Event Listeners ---
+csvFileInput.addEventListener('change', handleFileUpload);
+generateBtn.addEventListener('click', generateCards);
+printBtn.addEventListener('click', () => window.print());
+
+// Preset Listeners
+savePresetBtn.addEventListener('click', handleSavePreset);
+loadPresetBtn.addEventListener('click', handleLoadPreset);
+exportPresetBtn.addEventListener('click', handleExportPreset);
+importPresetInput.addEventListener('change', handleImportPreset);
+
+// Styling Listeners
+targetCategory.addEventListener('change', updateControlsToMatchCategory);
+bgColorPicker.addEventListener('input', () => applyStyle('bg', bgColorPicker.value));
+bgImageUpload.addEventListener('change', handleBgImageUpload);
+removeBgImageBtn.addEventListener('click', () => {
+    applyStyle('bgImage', 'none');
+    bgImageUpload.value = '';
+});
+bgScaleSlider.addEventListener('input', () => applyStyle('bgScale', bgScaleSlider.value));
+bgPosXSlider.addEventListener('input', () => applyStyle('bgPosX', bgPosXSlider.value));
+bgPosYSlider.addEventListener('input', () => applyStyle('bgPosY', bgPosYSlider.value));
+overlayColorPicker.addEventListener('input', () => applyStyle('overlayColor', overlayColorPicker.value));
+overlayOpacitySlider.addEventListener('input', () => applyStyle('overlayOpacity', overlayOpacitySlider.value));
+textColorPicker.addEventListener('input', () => applyStyle('text', textColorPicker.value));
+accentColorPicker.addEventListener('input', () => applyStyle('accent', accentColorPicker.value));
+
+fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilySelect.value));
+fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
+wordBreakToggle.addEventListener('change', () => applyStyle('wordBreak', wordBreakToggle.checked));
+showBuoyancyToggle.addEventListener('change', () => applyStyle('showBuoy', showBuoyancyToggle.checked));
+
+// Image Upload Listener
+imageUploadInput.addEventListener('change', handleImageSelection);
+
+/**
+ * Handles the CSV file upload
+ */
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        fileStatus.textContent = 'No file uploaded.';
+        generateBtn.disabled = true;
+        return;
+    }
+
+    fileStatus.textContent = `Selected: ${file.name}`;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        parsedCsvData = parseCSV(e.target.result);
+
+        if (parsedCsvData && parsedCsvData.length > 0) {
+            generateBtn.disabled = false;
+        } else {
+            generateBtn.disabled = true;
+            alert("Could not parse data. Ensure it's a valid CSV.");
+        }
+    };
+    reader.onerror = () => alert("Failed to read the file.");
+    reader.readAsText(file);
+}
+
+/**
+ * 100% Vanilla JS Custom CSV Parser (handles quoted commas and newlines)
+ */
+function parseCSV(text) {
+    if (!text) return [];
+
+    const rows = [];
+    let curRow = [];
+    let curCell = '';
+    let inQuote = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i], nextC = text[i + 1];
+
+        if (c === '"' && inQuote && nextC === '"') {
+            curCell += '"'; i++;
+        } else if (c === '"') {
+            inQuote = !inQuote;
+        } else if (c === ',' && !inQuote) {
+            curRow.push(curCell); curCell = '';
+        } else if ((c === '\n' || (c === '\r' && nextC === '\n')) && !inQuote) {
+            if (c === '\r') i++;
+            curRow.push(curCell); rows.push(curRow);
+            curRow = []; curCell = '';
+        } else if (c === '\r' && !inQuote) {
+            curRow.push(curCell); rows.push(curRow);
+            curRow = []; curCell = '';
+        } else {
+            curCell += c;
+        }
+    }
+    curRow.push(curCell);
+    if (curRow.length > 1 || curCell.trim() !== '') rows.push(curRow);
+    if (rows.length < 2) return [];
+
+    const headers = rows[0].map(h => h.trim());
+    const data = [];
+
+    for (let i = 1; i < rows.length; i++) {
+        if (rows[i].length === 1 && rows[i][0].trim() === '') continue;
+        const rowObj = {};
+        for (let j = 0; j < headers.length; j++) {
+            rowObj[headers[j]] = rows[i][j] ? rows[i][j].trim() : '';
+        }
+        data.push(rowObj);
+    }
+    return data;
+}
+
+/**
+ * Generates DOM cards and populates categories
+ */
+function generateCards() {
+    if (!parsedCsvData || parsedCsvData.length === 0) return;
+
+    cardGrid.innerHTML = '';
+    cardCategories.clear();
+    cardTitles.clear();
+    let totalCardsGenerated = 0;
+
+    parsedCsvData.forEach(rowData => {
+        // Track unique Card_Types for the Styling dropdown
+        const type = rowData.Card_Type ? rowData.Card_Type.trim() : 'Uncategorized';
+        const title = rowData.Card_Title ? rowData.Card_Title.trim() : 'Untitled';
+        if (type) cardCategories.add(type);
+        cardTitles.add(title);
+
+        // Handle Quantity. Default is 1 if not specified or invalid.
+        let qty = parseInt(rowData.Qty, 10);
+        if (isNaN(qty) || qty < 1) qty = 1;
+
+        for (let q = 0; q < qty; q++) {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'game-card';
+            cardEl.dataset.category = type; // Critical for targeted styling
+            cardEl.dataset.title = title;
+
+            // Build Top Badges
+            let badgesHTML = '';
+            // We consistently inject the badge html if there's data, and let 'display: flex|none' 
+            // from the CSS toggle it dynamically from the Styling Panel so sizing doesn't break.
+            if (rowData.Buoy_Mod) badgesHTML += `<span class="stat-badge buoy-badge">Buoyancy: ${escapeHTML(rowData.Buoy_Mod)}</span>`;
+
+            // Build Points HTML (Body)
+            let pointsHTML = '';
+            if (rowData.Min_Pts || rowData.Bio_Pts) {
+                pointsHTML = `<div class="card-points" style="margin: 0.05in 0; font-weight: 600; font-size: 0.6rem; color: var(--dynamic-card-accent);">`;
+                if (rowData.Min_Pts) pointsHTML += `<span style="margin-right: 0.1in;">Mineral Pts: ${escapeHTML(rowData.Min_Pts)}</span>`;
+                if (rowData.Bio_Pts) pointsHTML += `<span>Bio Pts: ${escapeHTML(rowData.Bio_Pts)}</span>`;
+                pointsHTML += `</div>`;
+            }
+
+            cardEl.innerHTML = `
+                <div class="card-bg-layer"></div>
+                <div class="card-overlay-layer"></div>
+                <div class="card-type-banner"></div>
+                <div class="card-header">
+                    <h3 class="card-title">${escapeHTML(rowData.Card_Title || 'Untitled')}</h3>
+                    <div class="card-stats">${badgesHTML}</div>
+                </div>
+                
+                <div class="card-image-placeholder">Click to add illustration</div>
+                
+                <div class="card-body">
+                    ${rowData.Standard_Text ? `<div class="card-standard-text">${escapeHTML(rowData.Standard_Text)}</div>` : ''}
+                    ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
+                    ${pointsHTML}
+                    ${rowData.Mechanic_Action ? `<div class="card-mechanic">${escapeHTML(rowData.Mechanic_Action)}</div>` : ''}
+                    ${rowData.Flavor_Text ? `<div class="card-flavor">${escapeHTML(rowData.Flavor_Text).replace(/\n/g, '<br>')}</div>` : ''}
+                </div>
+                ${rowData.Card_ID ? `<div class="card-id-footer">${escapeHTML(rowData.Card_ID)}</div>` : ''}
+            `;
+
+            // Attach click listener for Image Upload
+            const imgPlaceholder = cardEl.querySelector('.card-image-placeholder');
+            imgPlaceholder.addEventListener('click', () => {
+                activeImagePlaceholder = imgPlaceholder;
+                imageUploadInput.click();
+            });
+
+            // Apply existing styles immediately on generation
+            applyStoredStyles(cardEl, type, title);
+
+            cardGrid.appendChild(cardEl);
+            totalCardsGenerated++;
+        }
+    });
+
+    // Update Sidebar UI
+    cardCount.textContent = `${totalCardsGenerated} Cards Generated`;
+    printBtn.disabled = false;
+    presetSection.style.display = 'block';
+    presetDivider.style.display = 'block';
+    stylingSection.style.display = 'flex';
+
+    // Populate dropdown
+    updateCategoryDropdown();
+    populatePresetDropdown();
+}
+
+/**
+ * --- Interactive Illustrations Logic ---
+ */
+async function handleBgImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        applyStyle('bgImage', 'none');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.url) {
+            applyStyle('bgImage', `url("${data.url}")`);
+        }
+    } catch (err) {
+        console.error("Failed to upload background texture:", err);
+    }
+}
+
+async function handleImageSelection(event) {
+    const file = event.target.files[0];
+    if (!file || !activeImagePlaceholder) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.url) {
+            // Set the uploaded image as the background of the exact placeholder clicked
+            activeImagePlaceholder.style.backgroundImage = `url('${data.url}')`;
+            activeImagePlaceholder.classList.add('has-image');
+
+            // Reset the input so the same file could be selected again if needed
+            imageUploadInput.value = '';
+            activeImagePlaceholder = null;
+        }
+    } catch (err) {
+        console.error("Failed to upload illustration:", err);
+    }
+}
+
+/**
+ * --- Bulk Styling & Targeting Logic ---
+ */
+function updateCategoryDropdown() {
+    targetCategory.innerHTML = '<option value="all">All Cards</option>';
+
+    // Group 1: Categories
+    const catGroup = document.createElement('optgroup');
+    catGroup.label = "By Category";
+    cardCategories.forEach(cat => {
+        if (!categoryStyles["cat_" + cat]) categoryStyles["cat_" + cat] = { ...categoryStyles["all"] };
+        const opt = document.createElement('option');
+        opt.value = "cat_" + cat;
+        opt.textContent = `Category: ${cat}`;
+        catGroup.appendChild(opt);
+    });
+    targetCategory.appendChild(catGroup);
+
+    // Group 2: Single Cards
+    const cardGroup = document.createElement('optgroup');
+    cardGroup.label = "Single Individual Cards";
+    cardTitles.forEach(title => {
+        if (!categoryStyles["card_" + title]) categoryStyles["card_" + title] = { ...categoryStyles["all"] };
+        const opt = document.createElement('option');
+        opt.value = "card_" + title;
+        opt.textContent = `Card: ${title}`;
+        cardGroup.appendChild(opt);
+    });
+    targetCategory.appendChild(cardGroup);
+}
+
+function updateControlsToMatchCategory() {
+    const target = targetCategory.value;
+    const styles = categoryStyles[target];
+
+    // 1. Sync the UI controls if we have stored styles for this target
+    if (styles) {
+        bgColorPicker.value = styles.bg;
+        if (!styles.bgImage || styles.bgImage === 'none') {
+            bgImageUpload.value = '';
+        }
+        bgScaleSlider.value = styles.bgScale !== undefined ? styles.bgScale : "100";
+        bgPosXSlider.value = styles.bgPosX !== undefined ? styles.bgPosX : "50";
+        bgPosYSlider.value = styles.bgPosY !== undefined ? styles.bgPosY : "50";
+        overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
+        overlayOpacitySlider.value = styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0";
+        textColorPicker.value = styles.text;
+        accentColorPicker.value = styles.accent;
+
+        // Sync Typography Controls
+        fontFamilySelect.value = styles.font;
+        fontSizeSlider.value = styles.size;
+        wordBreakToggle.checked = styles.wordBreak;
+        showBuoyancyToggle.checked = (styles.showBuoy !== undefined) ? styles.showBuoy : true;
+    }
+
+    // 2. Filter the UI Grid to ONLY show the targeted cards
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        let shouldShow = false;
+        if (target === 'all') {
+            shouldShow = true;
+        } else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) {
+            shouldShow = true;
+        } else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) {
+            shouldShow = true;
+        }
+
+        // Hide or Show the physical card in the grid
+        card.style.display = shouldShow ? 'flex' : 'none';
+    });
+
+    // Update Accessibility Checker for the newly selected target
+    updateAccessibilityChecker();
+}
+
+function applyStyle(property, value) {
+    const target = targetCategory.value;
+
+    // Save state
+    if (!categoryStyles[target]) categoryStyles[target] = {};
+    categoryStyles[target][property] = value;
+
+    // Apply to DOM globally
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        let shouldApply = false;
+        if (target === 'all') shouldApply = true;
+        else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldApply = true;
+        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldApply = true;
+
+        if (shouldApply) {
+            updateCSSCustomProperty(card, property, value);
+        }
+    });
+
+    // Update the Accessibility Checker
+    if (property === 'bg' || property === 'text') {
+        updateAccessibilityChecker();
+    }
+
+    // Sub-propagation: If 'all' is modified, push it down to categories and cards so logic doesn't break
+    if (target === 'all') {
+        Object.keys(categoryStyles).forEach(key => {
+            if (key !== 'all') categoryStyles[key][property] = value;
+        });
+    } else if (target.startsWith('cat_')) {
+        // If a Category is styled, push that style into any Single Card data structures belonging to that category
+        const catName = target.substring(4);
+        cards.forEach(card => {
+            if (card.dataset.category === catName) {
+                const cardKey = "card_" + card.dataset.title;
+                if (categoryStyles[cardKey]) categoryStyles[cardKey][property] = value;
+            }
+        });
+    }
+}
+
+function hexToRgba(hex, opacity) {
+    let r = 0, g = 0, b = 0;
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else if (hex.length === 7) {
+        r = parseInt(hex[1] + hex[2], 16);
+        g = parseInt(hex[3] + hex[4], 16);
+        b = parseInt(hex[5] + hex[6], 16);
+    }
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+function updateCSSCustomProperty(cardDiv, propName, value) {
+    if (propName === 'bg') cardDiv.style.setProperty('--dynamic-card-bg', value);
+    if (propName === 'bgImage') {
+        const bgLayer = cardDiv.querySelector('.card-bg-layer');
+        if (bgLayer) bgLayer.style.backgroundImage = value;
+    }
+    if (propName === 'bgScale') cardDiv.style.setProperty('--dynamic-card-bg-size', `${value}%`);
+    if (propName === 'bgPosX') cardDiv.style.setProperty('--dynamic-card-bg-pos-x', `${value}%`);
+    if (propName === 'bgPosY') cardDiv.style.setProperty('--dynamic-card-bg-pos-y', `${value}%`);
+
+    if (propName === 'overlayColor' || propName === 'overlayOpacity') {
+        const styles = categoryStyles["card_" + cardDiv.dataset.title] || categoryStyles["cat_" + cardDiv.dataset.category] || categoryStyles["all"];
+        const hex = propName === 'overlayColor' ? value : (styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff");
+        const opacity = propName === 'overlayOpacity' ? value : (styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0");
+        const rgba = hexToRgba(hex, opacity);
+        cardDiv.style.setProperty('--dynamic-card-overlay', rgba);
+    }
+
+    if (propName === 'text') cardDiv.style.setProperty('--dynamic-card-text', value);
+    if (propName === 'accent') cardDiv.style.setProperty('--dynamic-card-accent', value);
+    if (propName === 'font') cardDiv.style.setProperty('--dynamic-card-font', value);
+    if (propName === 'size') {
+        // value is a multiplier from the slider (e.g. 0.8 to 1.5). Apply it to base 'rem'
+        cardDiv.style.setProperty('--dynamic-card-size', `${value}rem`);
+    }
+    if (propName === 'wordBreak') {
+        const breakType = value ? 'break-all' : 'normal';
+        const hyphenType = value ? 'auto' : 'none';
+        cardDiv.style.setProperty('--dynamic-card-break', breakType);
+        cardDiv.style.setProperty('--dynamic-card-hyphens', hyphenType);
+    }
+    if (propName === 'showBuoy') {
+        cardDiv.style.setProperty('--dynamic-card-buoy-display', value ? 'flex' : 'none');
+    }
+}
+
+function applyStoredStyles(cardDiv, category, title) {
+    // Single Card settings take precedence, then Category, then globally 'all'
+    let styles = categoryStyles["card_" + title] || categoryStyles["cat_" + category] || categoryStyles["all"];
+
+    updateCSSCustomProperty(cardDiv, 'bg', styles.bg);
+    updateCSSCustomProperty(cardDiv, 'bgImage', styles.bgImage !== undefined ? styles.bgImage : 'none');
+    updateCSSCustomProperty(cardDiv, 'bgScale', styles.bgScale !== undefined ? styles.bgScale : '100');
+    updateCSSCustomProperty(cardDiv, 'bgPosX', styles.bgPosX !== undefined ? styles.bgPosX : '50');
+    updateCSSCustomProperty(cardDiv, 'bgPosY', styles.bgPosY !== undefined ? styles.bgPosY : '50');
+    updateCSSCustomProperty(cardDiv, 'overlayColor', styles.overlayColor !== undefined ? styles.overlayColor : '#ffffff');
+    updateCSSCustomProperty(cardDiv, 'overlayOpacity', styles.overlayOpacity !== undefined ? styles.overlayOpacity : '0');
+    updateCSSCustomProperty(cardDiv, 'text', styles.text);
+    updateCSSCustomProperty(cardDiv, 'accent', styles.accent);
+    updateCSSCustomProperty(cardDiv, 'font', styles.font);
+    updateCSSCustomProperty(cardDiv, 'size', styles.size);
+    updateCSSCustomProperty(cardDiv, 'wordBreak', styles.wordBreak);
+    updateCSSCustomProperty(cardDiv, 'showBuoy', (styles.showBuoy !== undefined) ? styles.showBuoy : true);
+}
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag]));
+}
+
+/**
+ * --- Accessibility Checker (Contrast "Middleware") ---
+ */
+
+// Convert HEX color to RGB object
+function hexToRgb(hex) {
+    let r = 0, g = 0, b = 0;
+    // 3 digits
+    if (hex.length === 4) {
+        r = "0x" + hex[1] + hex[1];
+        g = "0x" + hex[2] + hex[2];
+        b = "0x" + hex[3] + hex[3];
+        // 6 digits
+    } else if (hex.length === 7) {
+        r = "0x" + hex[1] + hex[2];
+        g = "0x" + hex[3] + hex[4];
+        b = "0x" + hex[5] + hex[6];
+    }
+    return { r: +r, g: +g, b: +b };
+}
+
+// Darken an RGB color by a percentage (0 to 1) for print simulation
+function darkenRgb(rgb, percent) {
+    return {
+        r: Math.max(0, Math.floor(rgb.r * (1 - percent))),
+        g: Math.max(0, Math.floor(rgb.g * (1 - percent))),
+        b: Math.max(0, Math.floor(rgb.b * (1 - percent)))
+    };
+}
+
+// Calculate relative luminance for WCAG
+function getLuminance(rgb) {
+    const a = [rgb.r, rgb.g, rgb.b].map(function (v) {
+        v /= 255;
+        return v <= 0.03928
+            ? v / 12.92
+            : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+// Calculate contrast ratio between two RGB colors
+function getContrastRatio(rgb1, rgb2) {
+    const lum1 = getLuminance(rgb1);
+    const lum2 = getLuminance(rgb2);
+    const brightest = Math.max(lum1, lum2);
+    const darkest = Math.min(lum1, lum2);
+    return (brightest + 0.05) / (darkest + 0.05);
+}
+
+function updateAccessibilityChecker() {
+    if (!parsedCsvData || parsedCsvData.length === 0) return; // Wait until init
+
+    const target = targetCategory.value;
+    const styles = categoryStyles[target] || categoryStyles["all"];
+
+    // Default fallback colors
+    const bgColor = styles.bg || '#ffffff';
+    const textColor = styles.text || '#111827';
+
+    const bgRgb = hexToRgb(bgColor);
+    const textRgb = hexToRgb(textColor);
+
+    // Simulate print darkness: both colors print ~15% darker
+    const darkenedBgRgb = darkenRgb(bgRgb, 0.15);
+    const darkenedTextRgb = darkenRgb(textRgb, 0.15);
+
+    const ratio = getContrastRatio(darkenedBgRgb, darkenedTextRgb);
+
+    // Format ratio to 2 decimal places
+    const formattedRatio = (Math.round(ratio * 100) / 100).toFixed(2);
+    a11yRatio.textContent = formattedRatio + ':1';
+
+    // Clear existing classes
+    a11yChecker.classList.remove('a11y-pass', 'a11y-warn', 'a11y-fail');
+
+    if (ratio >= 7) {
+        a11yChecker.classList.add('a11y-pass');
+        a11yIcon.textContent = 'check_circle';
+        a11yStatus.textContent = 'Contrast: Excellent (AAA)';
+    } else if (ratio >= 4.5) {
+        a11yChecker.classList.add('a11y-warn');
+        a11yIcon.textContent = 'info';
+        a11yStatus.textContent = 'Contrast: Acceptable (AA)';
+    } else {
+        a11yChecker.classList.add('a11y-fail');
+        a11yIcon.textContent = 'warning';
+        a11yStatus.textContent = 'Contrast: Poor (Fails)';
+    }
+}
+
+/**
+ * --- Preset Management Logic ---
+ */
+
+const PRESETS_STORAGE_KEY = 'deckmaker_presets';
+
+function getLocalPresets() {
+    const data = localStorage.getItem(PRESETS_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+function saveLocalPresets(presets) {
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+}
+
+function populatePresetDropdown() {
+    const presets = getLocalPresets();
+    presetSelect.innerHTML = '<option value="">-- Select a Preset --</option>';
+
+    Object.keys(presets).forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        presetSelect.appendChild(opt);
+    });
+}
+
+function handleSavePreset() {
+    const name = prompt("Enter a name for this preset:");
+    if (!name || name.trim() === '') return;
+
+    const presets = getLocalPresets();
+    presets[name.trim()] = JSON.parse(JSON.stringify(categoryStyles));
+    saveLocalPresets(presets);
+
+    populatePresetDropdown();
+    presetSelect.value = name.trim();
+    alert(`Preset "${name.trim()}" saved locally!`);
+}
+
+function handleLoadPreset() {
+    const selected = presetSelect.value;
+    if (!selected) return;
+
+    const presets = getLocalPresets();
+    if (presets[selected]) {
+        if (confirm(`Load preset "${selected}"? This will overwrite current styles.`)) {
+            loadPresetData(presets[selected]);
+        }
+    }
+}
+
+function loadPresetData(data) {
+    categoryStyles = JSON.parse(JSON.stringify(data));
+
+    // Re-apply all styles
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        applyStoredStyles(card, card.dataset.category, card.dataset.title);
+    });
+
+    // Sync UI with 'all' settings by default or current targeted item
+    updateControlsToMatchCategory();
+}
+
+// Convert image URL to Base64
+async function urlToBase64(url) {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn(`Could not convert image ${url} to base64:`, e);
+        return null;
+    }
+}
+
+// Convert Base64 back to a Blob for upload
+function base64ToBlob(base64Data) {
+    const parts = base64Data.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    for (let i = 0; i < rawLength; ++i) {
+        uInt8Array[i] = raw.charCodeAt(i);
+    }
+    return new Blob([uInt8Array], { type: contentType });
+}
+
+// Export preset and bundle images as Base64
+async function handleExportPreset() {
+    exportPresetBtn.disabled = true;
+    exportPresetBtn.textContent = "Exporting...";
+
+    try {
+        const exportData = JSON.parse(JSON.stringify(categoryStyles));
+
+        // Find all bgImage values and convert to base64 if they are local uploads
+        for (const targetKey in exportData) {
+            const style = exportData[targetKey];
+            if (style.bgImage && style.bgImage.startsWith('url("/uploads/')) {
+                // Extract the actual URL
+                const url = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                const base64 = await urlToBase64(url);
+                if (base64) {
+                    style.bgImageBase64 = base64; // Store base64 alongside the original url
+                }
+            }
+        }
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "deckmaker_preset.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    } catch (err) {
+        console.error("Export failed:", err);
+        alert("Failed to export preset.");
+    } finally {
+        exportPresetBtn.disabled = false;
+        exportPresetBtn.textContent = "Export JSON";
+    }
+}
+
+// Import preset and re-upload base64 images
+async function handleImportPreset(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+
+            // Show a loading indicator since uploading takes time
+            document.body.style.cursor = 'wait';
+
+            // Scan for base64 images and upload them back to the server
+            const uploadPromises = [];
+            const urlMapping = {}; // Map old URLs to new URLs
+
+            for (const targetKey in importedData) {
+                const style = importedData[targetKey];
+                if (style.bgImageBase64) {
+                    const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+
+                    // Only upload if we haven't already uploaded this specific image during this import
+                    if (!urlMapping[oldUrl]) {
+                        const blob = base64ToBlob(style.bgImageBase64);
+                        // Extract extension from mime type (e.g., image/png -> png)
+                        const ext = blob.type.split('/')[1] || 'png';
+                        const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
+
+                        const formData = new FormData();
+                        formData.append('image', fileObj);
+
+                        const uploadPromise = fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                        }).then(res => res.json()).then(data => {
+                            if (data.url) {
+                                urlMapping[oldUrl] = data.url;
+                            }
+                        });
+
+                        uploadPromises.push(uploadPromise);
+                    }
+                }
+            }
+
+            // Wait for all image uploads to finish
+            if (uploadPromises.length > 0) {
+                await Promise.all(uploadPromises);
+            }
+
+            // Update the imported data with the newly generated URLs
+            for (const targetKey in importedData) {
+                const style = importedData[targetKey];
+                if (style.bgImageBase64) {
+                    const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    if (urlMapping[oldUrl]) {
+                        style.bgImage = `url("${urlMapping[oldUrl]}")`;
+                    }
+                    delete style.bgImageBase64; // Clean up the large base64 string
+                }
+            }
+
+            loadPresetData(importedData);
+
+            // Ask if they want to save it locally too
+            if (confirm("Preset imported successfully! Do you want to save this to your local browser presets?")) {
+                const name = prompt("Enter a name for this preset:");
+                if (name && name.trim() !== '') {
+                    const presets = getLocalPresets();
+                    presets[name.trim()] = JSON.parse(JSON.stringify(importedData));
+                    saveLocalPresets(presets);
+                    populatePresetDropdown();
+                    presetSelect.value = name.trim();
+                }
+            }
+
+        } catch (err) {
+            console.error("Import failed:", err);
+            alert("Failed to read or parse the JSON file.");
+        } finally {
+            document.body.style.cursor = 'default';
+            importPresetInput.value = ''; // Reset input
+        }
+    };
+    reader.readAsText(file);
+}
+

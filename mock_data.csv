@@ -1,0 +1,6 @@
+Card_ID,Card_Type,Card_Title,Buoy_Mod,Standard_Text,Red_Filter_Text,Min_Pts,Bio_Pts,Mechanic_Action,Flavor_Text,Qty
+UP-001,Upgrade,Experimental Chassis,-2,,,,,(Passive) Require 1 less action...,It doesn't groan under pressure anymore.,1
+UP-002,Upgrade,Nuclear Propulsion,-1,,,,,Move up to two spaces.,Raw, sustained power.,1
+SAM-001,Sample,Suspicious Mineral,0,You have found it.,It contains biology.,1,2,,The rock glints with a strange hue.,4
+SAM-002,Sample,Pure Isotope,0,You have found a mineral.,,2,0,,Cold, inert, and highly valuable.,3
+ACT-001,Action,Snoop Time,0,,,,,Discard another card...,The dark makes it easier to listen.,5

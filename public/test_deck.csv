@@ -1,0 +1,4 @@
+Card_Type,Card_Title,Quantity,Standard_Text,Buoy_Mod
+Upgrade,Super Laser,1,Deals 5 damage.,+1
+Upgrade,Shield,1,Blocks 5 damage.,+1
+Hero,Captain Falcon,1,"Show me your moves!",+2
