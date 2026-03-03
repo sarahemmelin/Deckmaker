@@ -635,6 +635,107 @@ button:disabled {
     outline: none;
 }
 
+.text-delete-btn {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: var(--shadow-sm);
+    z-index: 20;
+    line-height: 1;
+}
+
+.custom-text-element.is-editing .text-delete-btn {
+    display: flex;
+}
+
+.text-delete-btn:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+/* Floating Toolbar for Custom Texts */
+.floating-toolbar {
+    position: absolute;
+    z-index: 1000;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    background: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    transform: translate(-50%, 10px);
+}
+
+.floating-toolbar .toolbar-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.floating-toolbar label {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+}
+
+.floating-toolbar input[type="number"],
+.floating-toolbar select {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    height: 1.75rem;
+}
+
+.floating-toolbar .mini-picker {
+    width: 2.75rem;
+}
+
+.floating-toolbar .mini-picker .color-swatch-wrapper {
+    height: 1.75rem;
+    padding-left: 0.25rem;
+}
+
+.floating-toolbar .mini-picker .color-swatch-wrapper input[type="color"] {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.toolbar-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+    padding: 0;
+    transition: background-color 0.2s;
+    height: 1.75rem;
+    width: 1.75rem;
+}
+
+.toolbar-btn:hover {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
 .card-header {
     display: flex;
     justify-content: space-between;

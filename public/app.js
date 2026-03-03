@@ -923,6 +923,11 @@ function applyStoredStyles(cardDiv, category, title) {
         wrapper.style.left = txt.x + '%';
         wrapper.style.top = txt.y + '%';
 
+        if (txt.font && txt.font !== 'inherit') wrapper.style.fontFamily = txt.font;
+        if (txt.size) wrapper.style.fontSize = txt.size + 'rem';
+        if (txt.color) wrapper.style.color = txt.color;
+        if (txt.bg) wrapper.style.backgroundColor = txt.bg;
+
         const contentSpan = document.createElement('span');
         contentSpan.className = 'custom-text-content';
         contentSpan.innerText = txt.text;
@@ -1030,39 +1035,24 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
+
+        showCtxToolbar(wrapper, txtId);
         e.stopPropagation();
     });
 
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         removeCustomText(txtId);
-    });
-
-    contentSpan.addEventListener('blur', () => {
-        // slight timeout in case they clicked the delete button
-        setTimeout(() => {
-            if (!document.body.contains(wrapper)) return; // Already deleted
-
-            contentSpan.contentEditable = false;
-            wrapper.classList.remove('is-editing');
-            const newText = contentSpan.textContent.trim();
-
-            if (newText === '') {
-                removeCustomText(txtId);
-            } else {
-                syncCustomTextContentUI(txtId, newText);
-                updateCustomTextDataStore(txtId, { text: newText });
-            }
-        }, 100);
+        closeCtxEditor();
     });
 
     contentSpan.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            contentSpan.blur();
+            closeCtxEditor();
         } else if (e.key === 'Escape') {
             e.preventDefault();
-            contentSpan.blur();
+            closeCtxEditor();
         }
     });
 }
@@ -1154,6 +1144,97 @@ function syncCustomTextPosUI(id, newX, newY) {
         }
     });
 }
+
+/**
+ * --- Custom Text Floating Toolbar Logic ---
+ */
+const customTextToolbar = document.getElementById('customTextToolbar');
+const ctxFontSelect = document.getElementById('ctxFontSelect');
+const ctxSizeInput = document.getElementById('ctxSizeInput');
+const ctxColorPicker = document.getElementById('ctxColorPicker');
+const ctxBgPicker = document.getElementById('ctxBgPicker');
+const ctxClearBgBtn = document.getElementById('ctxClearBgBtn');
+
+let activeCtxId = null;
+let activeCtxWrapper = null;
+
+document.addEventListener('mousedown', (e) => {
+    if (activeCtxWrapper && activeCtxWrapper.classList.contains('is-editing')) {
+        if (!activeCtxWrapper.contains(e.target) && !customTextToolbar.contains(e.target)) {
+            closeCtxEditor();
+        }
+    }
+});
+
+function closeCtxEditor() {
+    if (!activeCtxWrapper) return;
+    const contentSpan = activeCtxWrapper.querySelector('.custom-text-content');
+    contentSpan.contentEditable = false;
+    activeCtxWrapper.classList.remove('is-editing');
+
+    customTextToolbar.style.display = 'none';
+
+    const newText = contentSpan.textContent.trim();
+    if (newText !== '') {
+        syncCustomTextContentUI(activeCtxId, newText);
+        updateCustomTextDataStore(activeCtxId, { text: newText });
+    }
+
+    activeCtxWrapper = null;
+    activeCtxId = null;
+}
+
+function showCtxToolbar(wrapper, id) {
+    activeCtxWrapper = wrapper;
+    activeCtxId = id;
+
+    const target = targetCategory.value;
+    let txtData = null;
+
+    const searchTarget = categoryStyles["card_" + wrapper.closest('.game-card').dataset.title] || categoryStyles[target] || categoryStyles["all"];
+    if (searchTarget && searchTarget.customTexts) {
+        txtData = searchTarget.customTexts.find(t => t.id === id);
+    }
+
+    if (txtData) {
+        ctxFontSelect.value = txtData.font || 'inherit';
+        ctxSizeInput.value = txtData.size || 1;
+        ctxColorPicker.value = txtData.color || '#111827';
+        // HTML Color inputs only support 6-character hex
+        ctxBgPicker.value = (txtData.bg && txtData.bg !== 'transparent') ? txtData.bg : '#ffffff';
+    }
+
+    const rect = wrapper.getBoundingClientRect();
+    customTextToolbar.style.display = 'flex';
+    customTextToolbar.style.left = (rect.left + rect.width / 2) + 'px';
+    customTextToolbar.style.top = (rect.top - 10) + 'px';
+}
+
+ctxFontSelect.addEventListener('change', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { font: ctxFontSelect.value });
+    activeCtxWrapper.style.fontFamily = ctxFontSelect.value === 'inherit' ? '' : ctxFontSelect.value;
+});
+ctxSizeInput.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { size: ctxSizeInput.value });
+    activeCtxWrapper.style.fontSize = ctxSizeInput.value + 'rem';
+});
+ctxColorPicker.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { color: ctxColorPicker.value });
+    activeCtxWrapper.style.color = ctxColorPicker.value;
+});
+ctxBgPicker.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { bg: ctxBgPicker.value });
+    activeCtxWrapper.style.backgroundColor = ctxBgPicker.value;
+});
+ctxClearBgBtn.addEventListener('click', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { bg: 'transparent' });
+    activeCtxWrapper.style.backgroundColor = 'transparent';
+});
 
 function syncCustomTextContentUI(id, newText) {
     const target = targetCategory.value;

@@ -348,6 +348,51 @@
     <!-- Hidden input for interactive image uploads -->
     <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
 
+    <!-- Floating Toolbar for Custom Texts -->
+    <div id="customTextToolbar" class="floating-toolbar" style="display: none;">
+        <div class="toolbar-group">
+            <label for="ctxFontSelect">Font</label>
+            <select id="ctxFontSelect" class="style-select">
+                <option value="inherit">Card Default</option>
+                <option value="'Inter', sans-serif">Inter</option>
+                <option value="'Roboto', sans-serif">Roboto</option>
+                <option value="'Montserrat', sans-serif">Montserrat</option>
+                <option value="'Oswald', sans-serif">Oswald</option>
+                <option value="'Playfair Display', serif">Playfair Display</option>
+                <option value="'Georgia', serif">Georgia</option>
+                <option value="'Courier New', monospace">Courier</option>
+                <option value="'Impact', sans-serif">Impact</option>
+            </select>
+        </div>
+        <div class="toolbar-group">
+            <label for="ctxSizeInput">Size</label>
+            <input type="number" id="ctxSizeInput" step="0.1" min="0.5" max="5.0" title="Multiplier (e.g. 1.2)">
+        </div>
+        <div class="toolbar-group">
+            <label for="ctxColorPicker">Text</label>
+            <div class="lightning-color-picker mini-picker">
+                <label class="color-swatch-wrapper">
+                    <input type="color" id="ctxColorPicker">
+                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                </label>
+            </div>
+        </div>
+        <div class="toolbar-group">
+            <label for="ctxBgPicker">Backdrop</label>
+            <div class="lightning-color-picker mini-picker">
+                <label class="color-swatch-wrapper">
+                    <input type="color" id="ctxBgPicker">
+                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                </label>
+            </div>
+        </div>
+        <div class="toolbar-group">
+            <button id="ctxClearBgBtn" class="toolbar-btn" title="Clear Backdrop">
+                <span class="material-icons">format_color_reset</span>
+            </button>
+        </div>
+    </div>
+
     <!-- Application Logic -->
     <script src="app.js"></script>
 </body>
