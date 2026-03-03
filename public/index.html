@@ -102,10 +102,15 @@
                 <div class="style-field">
                     <label for="targetCategory" style="font-weight: bold; color: var(--text-primary);">Target
                         Select:</label>
-                    <select id="targetCategory" class="style-select">
+                    <select id="targetCategory" class="style-select" style="width: 100%; margin-bottom: 0.25rem;">
                         <option value="all">All Cards</option>
                         <!-- Options generated dynamically based on Card_Type -->
                     </select>
+                    <button id="backToAllBtn" class="secondary-btn"
+                        style="display: none; padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;">
+                        <span class="material-icons btn-icon" style="font-size: 1rem;">arrow_back</span>
+                        Back to All Cards
+                    </button>
                 </div>
 
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />

@@ -45,6 +45,7 @@ const fontSizeSlider = document.getElementById('fontSizeSlider');
 const wordBreakToggle = document.getElementById('wordBreakToggle');
 const showBuoyancyToggle = document.getElementById('showBuoyancyToggle');
 const addCustomTextBtn = document.getElementById('addCustomTextBtn');
+const backToAllBtn = document.getElementById('backToAllBtn');
 
 // Accessibility Checker Selectors
 const a11yChecker = document.getElementById('a11yChecker');
@@ -67,6 +68,7 @@ let categoryStyles = {
     "all": {
         bg: "#ffffff",
         bgImage: "none",
+        fgImage: "none",
         bgScale: "100",
         bgPosX: "50",
         bgPosY: "50",
@@ -106,7 +108,23 @@ presetSelect.addEventListener('change', () => {
 
 // Styling Listeners
 // Styling Listeners
-targetCategory.addEventListener('change', updateControlsToMatchCategory);
+targetCategory.addEventListener('change', () => {
+    updateControlsToMatchCategory();
+    if (targetCategory.value === 'all') {
+        backToAllBtn.style.display = 'none';
+    } else {
+        backToAllBtn.style.display = 'flex';
+    }
+});
+
+backToAllBtn.addEventListener('click', () => {
+    targetCategory.value = 'all';
+    targetCategory.dispatchEvent(new Event('change'));
+
+    // Scroll sidebar to top so user sees the newly expanded controls
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+});
 
 // Color Picker Helpers
 function syncColorInput(picker, textInput, property) {
@@ -546,6 +564,19 @@ async function handleImageSelection(event) {
             activeImagePlaceholder.style.backgroundImage = `url('${data.url}')`;
             activeImagePlaceholder.classList.add('has-image');
 
+            // Save state to correct category/card
+            const cardEl = activeImagePlaceholder.closest('.game-card');
+            if (cardEl) {
+                const targetTitle = cardEl.dataset.title;
+                const targetKey = "card_" + targetTitle;
+
+                if (!categoryStyles[targetKey]) {
+                    categoryStyles[targetKey] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+                }
+                categoryStyles[targetKey].fgImage = `url('${data.url}')`;
+                resetPresetButtons();
+            }
+
             // Reset the input so the same file could be selected again if needed
             imageUploadInput.value = '';
             activeImagePlaceholder = null;
@@ -714,6 +745,17 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     if (propName === 'fgScale') cardDiv.style.setProperty('--dynamic-card-fg-size', `${value}%`);
     if (propName === 'fgPosX') cardDiv.style.setProperty('--dynamic-card-fg-pos-x', `${value}%`);
     if (propName === 'fgPosY') cardDiv.style.setProperty('--dynamic-card-fg-pos-y', `${value}%`);
+    if (propName === 'fgImage') {
+        const fgLayer = cardDiv.querySelector('.card-image-placeholder');
+        if (fgLayer) {
+            fgLayer.style.backgroundImage = value;
+            if (value !== 'none') {
+                fgLayer.classList.add('has-image');
+            } else {
+                fgLayer.classList.remove('has-image');
+            }
+        }
+    }
 
     if (propName === 'overlayColor' || propName === 'overlayOpacity') {
         const styles = categoryStyles["card_" + cardDiv.dataset.title] || categoryStyles["cat_" + cardDiv.dataset.category] || categoryStyles["all"];
@@ -750,6 +792,7 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'bgScale', styles.bgScale !== undefined ? styles.bgScale : '100');
     updateCSSCustomProperty(cardDiv, 'bgPosX', styles.bgPosX !== undefined ? styles.bgPosX : '50');
     updateCSSCustomProperty(cardDiv, 'bgPosY', styles.bgPosY !== undefined ? styles.bgPosY : '50');
+    updateCSSCustomProperty(cardDiv, 'fgImage', styles.fgImage !== undefined ? styles.fgImage : 'none');
     updateCSSCustomProperty(cardDiv, 'fgScale', styles.fgScale !== undefined ? styles.fgScale : '100');
     updateCSSCustomProperty(cardDiv, 'fgPosX', styles.fgPosX !== undefined ? styles.fgPosX : '50');
     updateCSSCustomProperty(cardDiv, 'fgPosY', styles.fgPosY !== undefined ? styles.fgPosY : '50');
@@ -1234,15 +1277,21 @@ async function handleExportPreset() {
     try {
         const exportData = JSON.parse(JSON.stringify(categoryStyles));
 
-        // Find all bgImage values and convert to base64 if they are local uploads
+        // Find all bgImage and fgImage values and convert to base64 if they are local uploads
         for (const targetKey in exportData) {
             const style = exportData[targetKey];
-            if (style.bgImage && style.bgImage.startsWith('url("/uploads/')) {
-                // Extract the actual URL
-                const url = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                const base64 = await urlToBase64(url);
-                if (base64) {
-                    style.bgImageBase64 = base64; // Store base64 alongside the original url
+            if (style.bgImage && style.bgImage.includes('/uploads/')) {
+                const urlMatch = style.bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+                if (urlMatch && urlMatch[1]) {
+                    const base64 = await urlToBase64(urlMatch[1]);
+                    if (base64) style.bgImageBase64 = base64;
+                }
+            }
+            if (style.fgImage && style.fgImage.includes('/uploads/')) {
+                const urlMatch = style.fgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+                if (urlMatch && urlMatch[1]) {
+                    const base64 = await urlToBase64(urlMatch[1]);
+                    if (base64) style.fgImageBase64 = base64;
                 }
             }
         }
@@ -1282,13 +1331,11 @@ async function handleImportPreset(event) {
 
             for (const targetKey in importedData) {
                 const style = importedData[targetKey];
+
                 if (style.bgImageBase64) {
                     const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-
-                    // Only upload if we haven't already uploaded this specific image during this import
                     if (!urlMapping[oldUrl]) {
                         const blob = base64ToBlob(style.bgImageBase64);
-                        // Extract extension from mime type (e.g., image/png -> png)
                         const ext = blob.type.split('/')[1] || 'png';
                         const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
 
@@ -1299,9 +1346,28 @@ async function handleImportPreset(event) {
                             method: 'POST',
                             body: formData
                         }).then(res => res.json()).then(data => {
-                            if (data.url) {
-                                urlMapping[oldUrl] = data.url;
-                            }
+                            if (data.url) urlMapping[oldUrl] = data.url;
+                        });
+
+                        uploadPromises.push(uploadPromise);
+                    }
+                }
+
+                if (style.fgImageBase64) {
+                    const oldUrl = style.fgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    if (!urlMapping[oldUrl]) {
+                        const blob = base64ToBlob(style.fgImageBase64);
+                        const ext = blob.type.split('/')[1] || 'png';
+                        const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
+
+                        const formData = new FormData();
+                        formData.append('image', fileObj);
+
+                        const uploadPromise = fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                        }).then(res => res.json()).then(data => {
+                            if (data.url) urlMapping[oldUrl] = data.url;
                         });
 
                         uploadPromises.push(uploadPromise);
@@ -1317,12 +1383,21 @@ async function handleImportPreset(event) {
             // Update the imported data with the newly generated URLs
             for (const targetKey in importedData) {
                 const style = importedData[targetKey];
+
                 if (style.bgImageBase64) {
                     const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
                     if (urlMapping[oldUrl]) {
                         style.bgImage = `url("${urlMapping[oldUrl]}")`;
                     }
-                    delete style.bgImageBase64; // Clean up the large base64 string
+                    delete style.bgImageBase64;
+                }
+
+                if (style.fgImageBase64) {
+                    const oldUrl = style.fgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                    if (urlMapping[oldUrl]) {
+                        style.fgImage = `url('${urlMapping[oldUrl]}')`; // Keep single quotes matching original standard 
+                    }
+                    delete style.fgImageBase64;
                 }
             }
 
