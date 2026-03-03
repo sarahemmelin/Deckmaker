@@ -31,6 +31,7 @@ const bgScaleSlider = document.getElementById('bgScaleSlider');
 const bgPosXSlider = document.getElementById('bgPosXSlider');
 const bgPosYSlider = document.getElementById('bgPosYSlider');
 const fgScaleSlider = document.getElementById('fgScaleSlider');
+const fgHeightSlider = document.getElementById('fgHeightSlider');
 const fgPosXSlider = document.getElementById('fgPosXSlider');
 const fgPosYSlider = document.getElementById('fgPosYSlider');
 const overlayColorPicker = document.getElementById('overlayColorPicker');
@@ -73,6 +74,7 @@ let categoryStyles = {
         bgPosX: "50",
         bgPosY: "50",
         fgScale: "100",
+        fgHeight: "1",
         fgPosX: "50",
         fgPosY: "50",
         overlayColor: "#ffffff",
@@ -194,6 +196,7 @@ bindSlider(bgScaleSlider, 'bgScale');
 bindSlider(bgPosXSlider, 'bgPosX');
 bindSlider(bgPosYSlider, 'bgPosY');
 bindSlider(fgScaleSlider, 'fgScale');
+bindSlider(fgHeightSlider, 'fgHeight');
 bindSlider(fgPosXSlider, 'fgPosX');
 bindSlider(fgPosYSlider, 'fgPosY');
 bindSlider(overlayOpacitySlider, 'overlayOpacity');
@@ -658,6 +661,7 @@ function updateControlsToMatchCategory() {
         bgPosXSlider.value = styles.bgPosX !== undefined ? styles.bgPosX : "50";
         bgPosYSlider.value = styles.bgPosY !== undefined ? styles.bgPosY : "50";
         fgScaleSlider.value = styles.fgScale !== undefined ? styles.fgScale : "100";
+        fgHeightSlider.value = styles.fgHeight !== undefined ? styles.fgHeight : "1";
         fgPosXSlider.value = styles.fgPosX !== undefined ? styles.fgPosX : "50";
         fgPosYSlider.value = styles.fgPosY !== undefined ? styles.fgPosY : "50";
         overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
@@ -679,6 +683,7 @@ function updateControlsToMatchCategory() {
         updateSliderBackground(bgPosXSlider);
         updateSliderBackground(bgPosYSlider);
         updateSliderBackground(fgScaleSlider);
+        updateSliderBackground(fgHeightSlider);
         updateSliderBackground(fgPosXSlider);
         updateSliderBackground(fgPosYSlider);
         updateSliderBackground(overlayOpacitySlider);
@@ -787,6 +792,7 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     if (propName === 'bgPosY') cardDiv.style.setProperty('--dynamic-card-bg-pos-y', `${value}%`);
 
     if (propName === 'fgScale') cardDiv.style.setProperty('--dynamic-card-fg-size', `${value}%`);
+    if (propName === 'fgHeight') cardDiv.style.setProperty('--dynamic-card-fg-height', `${value}in`);
     if (propName === 'fgPosX') cardDiv.style.setProperty('--dynamic-card-fg-pos-x', `${value}%`);
     if (propName === 'fgPosY') cardDiv.style.setProperty('--dynamic-card-fg-pos-y', `${value}%`);
     if (propName === 'fgImage') {
@@ -838,6 +844,7 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'bgPosY', styles.bgPosY !== undefined ? styles.bgPosY : '50');
     updateCSSCustomProperty(cardDiv, 'fgImage', styles.fgImage !== undefined ? styles.fgImage : 'none');
     updateCSSCustomProperty(cardDiv, 'fgScale', styles.fgScale !== undefined ? styles.fgScale : '100');
+    updateCSSCustomProperty(cardDiv, 'fgHeight', styles.fgHeight !== undefined ? styles.fgHeight : '1');
     updateCSSCustomProperty(cardDiv, 'fgPosX', styles.fgPosX !== undefined ? styles.fgPosX : '50');
     updateCSSCustomProperty(cardDiv, 'fgPosY', styles.fgPosY !== undefined ? styles.fgPosY : '50');
     updateCSSCustomProperty(cardDiv, 'overlayColor', styles.overlayColor !== undefined ? styles.overlayColor : '#ffffff');

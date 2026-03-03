@@ -668,7 +668,7 @@ button:disabled {
 }
 
 .card-image-placeholder {
-    height: 1in;
+    height: var(--dynamic-card-fg-height, 1in);
     background-color: rgba(0, 0, 0, 0.05);
     /* very light tint of whatever background */
     border: none;
