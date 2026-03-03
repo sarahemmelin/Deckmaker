@@ -8,7 +8,9 @@
     <!-- Modern typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=Oswald:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&display=swap"
+        rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -49,9 +51,9 @@
                 <div class="style-field"
                     style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
                     <button id="updatePresetBtn" class="primary-btn"
-                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1;" disabled>Update</button>
+                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1;" disabled>Save</button>
                     <button id="savePresetBtn" class="secondary-btn"
-                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1;">Save As...</button>
+                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1;">Save New...</button>
                     <button id="deletePresetBtn" class="danger-btn"
                         style="padding: 0.25rem 0.5rem; font-size: 0.8rem; flex: 1; background-color: #ef4444; color: white; border: none; cursor: pointer; border-radius: 4px;"
                         disabled title="Delete selected preset">Delete</button>
@@ -72,9 +74,30 @@
 
             <hr class="sidebar-divider" id="presetDivider" style="display: none;" />
 
+            <!-- Backside Mapping -->
+            <div class="control-group mapping-section" id="mappingSection" style="display: none;">
+                <h3>Backside Mapping</h3>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Assign a backside to
+                    a Category or override specific Individual Cards.</p>
+                <div class="style-field">
+                    <label for="mappingTargetSelect">Target:</label>
+                    <select id="mappingTargetSelect" class="style-select">
+                        <option value="">-- Select Target --</option>
+                    </select>
+                </div>
+                <div class="style-field">
+                    <label for="mappingBacksideSelect">Backside:</label>
+                    <select id="mappingBacksideSelect" class="style-select" disabled>
+                        <option value="">-- None --</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="sidebar-divider" id="mappingDivider" style="display: none;" />
+
             <!-- Styling Controls -->
             <div class="control-group styling-section" id="stylingSection" style="display: none;">
-                <h3>Card Styling</h3>
+                <h3>Frontside Mapping</h3>
 
                 <div class="style-field">
                     <label for="targetCategory">Target Category:</label>
@@ -118,6 +141,29 @@
                     style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                     <label for="bgPosYSlider">Texture Pos Y (%):</label>
                     <input type="range" id="bgPosYSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
+                </div>
+
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+                <h4
+                    style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.25rem; margin-bottom: 0.25rem;">
+                    Illustration Adjustments</h4>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="fgScaleSlider">Image Scale (%):</label>
+                    <input type="range" id="fgScaleSlider" min="10" max="300" step="1" value="100" style="width: 100%;">
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="fgPosXSlider">Image Pos X (%):</label>
+                    <input type="range" id="fgPosXSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
+                </div>
+
+                <div class="style-field"
+                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                    <label for="fgPosYSlider">Image Pos Y (%):</label>
+                    <input type="range" id="fgPosYSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
                 </div>
 
                 <div class="style-field">
@@ -167,6 +213,10 @@
                     <label for="fontFamilySelect">Font Family:</label>
                     <select id="fontFamilySelect" class="style-select">
                         <option value="'Inter', sans-serif">Inter (Modern)</option>
+                        <option value="'Roboto', sans-serif">Roboto</option>
+                        <option value="'Montserrat', sans-serif">Montserrat</option>
+                        <option value="'Oswald', sans-serif">Oswald</option>
+                        <option value="'Playfair Display', serif">Playfair Display</option>
                         <option value="'Georgia', serif">Georgia (Classic)</option>
                         <option value="'Courier New', monospace">Courier (Tech)</option>
                         <option value="'Impact', sans-serif">Impact (Bold)</option>
@@ -177,7 +227,7 @@
                 <div class="style-field"
                     style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                     <label for="fontSizeSlider">Base Font Size:</label>
-                    <input type="range" id="fontSizeSlider" min="0.5" max="1.5" step="0.05" value="1"
+                    <input type="range" id="fontSizeSlider" min="0.1" max="4.0" step="0.05" value="1"
                         style="width: 100%;">
                 </div>
 
@@ -190,6 +240,20 @@
                     <label for="showBuoyancyToggle">Show Buoyancy Badge:</label>
                     <input type="checkbox" id="showBuoyancyToggle" checked>
                 </div>
+
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+                <h4
+                    style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.25rem; margin-bottom: 0.25rem;">
+                    Custom Text Elements</h4>
+                <div class="style-field">
+                    <button id="addCustomTextBtn" class="secondary-btn"
+                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;">
+                        <span class="material-icons btn-icon" style="font-size: 1rem;">add_circle_outline</span> Add
+                        Text Element
+                    </button>
+                </div>
+                <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; text-align: center;">
+                    Double-click text to edit, drag to move.</p>
             </div>
 
             <div class="control-group action-group">
@@ -217,6 +281,9 @@
                     <p>Upload a CSV file exported from Google Sheets to render your cards.</p>
                 </div>
             </div>
+
+            <!-- Hidden Print Layout Container -->
+            <div id="printLayout" class="print-layout"></div>
         </main>
     </div>
 

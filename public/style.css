@@ -32,6 +32,11 @@
     --dynamic-card-text: #111827;
     --dynamic-card-accent: #1f2937;
 
+    /* Foreground Image Adjustments */
+    --dynamic-card-fg-size: 100%;
+    --dynamic-card-fg-pos-x: 50%;
+    --dynamic-card-fg-pos-y: 50%;
+
     /* Typography Defaults */
     --dynamic-card-font: 'Inter', sans-serif;
     --dynamic-card-size: 1rem;
@@ -149,13 +154,6 @@ body {
 }
 
 /* Styling Controls */
-.styling-section h3 {
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-}
 
 .style-field {
     display: flex;
@@ -336,6 +334,10 @@ button:disabled {
     align-items: flex-start;
 }
 
+.print-layout {
+    display: none;
+}
+
 /* =========================================
    VISUAL GAME CARD SPECIFICS
    ========================================= */
@@ -357,6 +359,34 @@ button:disabled {
     font-family: var(--dynamic-card-font);
     font-size: var(--dynamic-card-size);
     transition: color 0.2s, font-size 0.2s;
+}
+
+/* Backside Card Simplify */
+.game-card.is-backside {
+    padding: 0 !important;
+}
+
+.game-card.is-backside .card-header,
+.game-card.is-backside .card-body,
+.game-card.is-backside .card-type-banner,
+.game-card.is-backside .card-id-footer,
+.game-card.is-backside .card-overlay-layer {
+    display: none !important;
+}
+
+/* User-stylable text label above backside cards in the UI */
+.backside-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    width: 100%;
+}
+
+.game-card.is-backside .card-image-placeholder {
+    height: 100%;
+    margin: 0;
+    border-radius: inherit;
 }
 
 /* Texture Layer (Bottom) */
@@ -396,6 +426,36 @@ button:disabled {
     right: 0;
     height: 0.08in;
     background-color: var(--dynamic-card-accent);
+}
+
+/* Custom Text Elements */
+.custom-text-element {
+    position: absolute;
+    z-index: 10;
+    cursor: grab;
+    user-select: none;
+    padding: 2px 4px;
+    border: 1px dashed transparent;
+    transition: border-color 0.2s;
+    /* Transformation offsets to center text on X/Y percentage */
+    transform: translate(-50%, -50%);
+    font-weight: 600;
+}
+
+.custom-text-element:hover {
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+.custom-text-element:active {
+    cursor: grabbing;
+}
+
+.custom-text-element.is-editing {
+    cursor: text;
+    user-select: text;
+    border-color: var(--accent-color);
+    background-color: rgba(255, 255, 255, 0.8);
+    outline: none;
 }
 
 .card-header {
@@ -456,7 +516,9 @@ button:disabled {
     height: 1in;
     background-color: rgba(0, 0, 0, 0.05);
     /* very light tint of whatever background */
-    border: 1px dashed var(--dynamic-card-accent);
+    border: none;
+    margin-left: -0.15in;
+    margin-right: -0.15in;
     margin-bottom: 0.05in;
     display: flex;
     align-items: center;
@@ -466,8 +528,9 @@ button:disabled {
     font-size: 0.65rem;
     font-style: italic;
     cursor: pointer;
-    background-size: cover;
-    background-position: center;
+    background-size: var(--dynamic-card-fg-size);
+    background-position: var(--dynamic-card-fg-pos-x) var(--dynamic-card-fg-pos-y);
+    background-repeat: no-repeat;
     transition: opacity 0.2s;
 }
 
@@ -477,10 +540,10 @@ button:disabled {
 }
 
 .card-image-placeholder.has-image {
-    border: 1px solid var(--dynamic-card-accent);
     color: transparent;
     /* hide the 'Click to add illustration' text */
     text-indent: -9999px;
+    opacity: 1;
 }
 
 .card-body {
@@ -568,11 +631,29 @@ button:disabled {
     }
 
     .card-grid {
+        display: none !important;
+    }
+
+    .print-layout {
+        display: block !important;
+    }
+
+    .print-page {
         display: grid !important;
         grid-template-columns: repeat(3, var(--card-width)) !important;
         grid-auto-rows: var(--card-height) !important;
         gap: 0 !important;
         justify-content: center;
+        align-content: start;
+        page-break-after: always;
+        break-after: page;
+        /* Padding to prevent cutting off at top/bottom of real paper */
+        padding-top: 0.2in;
+    }
+
+    .print-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
     }
 
     .game-card {

@@ -8,6 +8,10 @@ const cardCount = document.getElementById('cardCount');
 
 const presetSection = document.getElementById('presetSection');
 const presetDivider = document.getElementById('presetDivider');
+const mappingSection = document.getElementById('mappingSection');
+const mappingTargetSelect = document.getElementById('mappingTargetSelect');
+const mappingBacksideSelect = document.getElementById('mappingBacksideSelect');
+const mappingDivider = document.getElementById('mappingDivider');
 const presetSelect = document.getElementById('presetSelect');
 const loadPresetBtn = document.getElementById('loadPresetBtn');
 const savePresetBtn = document.getElementById('savePresetBtn');
@@ -25,6 +29,9 @@ const removeBgImageBtn = document.getElementById('removeBgImageBtn');
 const bgScaleSlider = document.getElementById('bgScaleSlider');
 const bgPosXSlider = document.getElementById('bgPosXSlider');
 const bgPosYSlider = document.getElementById('bgPosYSlider');
+const fgScaleSlider = document.getElementById('fgScaleSlider');
+const fgPosXSlider = document.getElementById('fgPosXSlider');
+const fgPosYSlider = document.getElementById('fgPosYSlider');
 const overlayColorPicker = document.getElementById('overlayColorPicker');
 const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
 const textColorPicker = document.getElementById('textColorPicker');
@@ -33,6 +40,7 @@ const fontFamilySelect = document.getElementById('fontFamilySelect');
 const fontSizeSlider = document.getElementById('fontSizeSlider');
 const wordBreakToggle = document.getElementById('wordBreakToggle');
 const showBuoyancyToggle = document.getElementById('showBuoyancyToggle');
+const addCustomTextBtn = document.getElementById('addCustomTextBtn');
 
 // Accessibility Checker Selectors
 const a11yChecker = document.getElementById('a11yChecker');
@@ -47,6 +55,7 @@ let parsedCsvData = [];
 let cardCategories = new Set();
 let cardTitles = new Set();
 let activeImagePlaceholder = null;
+let backsideMappings = {}; // Store Category -> Back Card Title Mappings
 
 // Stores styling state globally. 
 // Format: { "cat_Upgrade": { bg: "#fff", ... }, "card_Experimental Chassis": { bg: ... }, "all": { ... } }
@@ -57,6 +66,9 @@ let categoryStyles = {
         bgScale: "100",
         bgPosX: "50",
         bgPosY: "50",
+        fgScale: "100",
+        fgPosX: "50",
+        fgPosY: "50",
         overlayColor: "#ffffff",
         overlayOpacity: "0",
         text: "#111827",
@@ -64,14 +76,15 @@ let categoryStyles = {
         font: "'Inter', sans-serif",
         size: "1",
         wordBreak: false,
-        showBuoy: true
+        showBuoy: true,
+        customTexts: []
     }
 };
 
 // --- Event Listeners ---
 csvFileInput.addEventListener('change', handleFileUpload);
 generateBtn.addEventListener('click', generateCards);
-printBtn.addEventListener('click', () => window.print());
+printBtn.addEventListener('click', generatePrintLayout);
 
 // Preset Listeners
 savePresetBtn.addEventListener('click', handleSavePreset);
@@ -98,6 +111,9 @@ removeBgImageBtn.addEventListener('click', () => {
 bgScaleSlider.addEventListener('input', () => applyStyle('bgScale', bgScaleSlider.value));
 bgPosXSlider.addEventListener('input', () => applyStyle('bgPosX', bgPosXSlider.value));
 bgPosYSlider.addEventListener('input', () => applyStyle('bgPosY', bgPosYSlider.value));
+fgScaleSlider.addEventListener('input', () => applyStyle('fgScale', fgScaleSlider.value));
+fgPosXSlider.addEventListener('input', () => applyStyle('fgPosX', fgPosXSlider.value));
+fgPosYSlider.addEventListener('input', () => applyStyle('fgPosY', fgPosYSlider.value));
 overlayColorPicker.addEventListener('input', () => applyStyle('overlayColor', overlayColorPicker.value));
 overlayOpacitySlider.addEventListener('input', () => applyStyle('overlayOpacity', overlayOpacitySlider.value));
 textColorPicker.addEventListener('input', () => applyStyle('text', textColorPicker.value));
@@ -107,6 +123,26 @@ fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilyS
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
 wordBreakToggle.addEventListener('change', () => applyStyle('wordBreak', wordBreakToggle.checked));
 showBuoyancyToggle.addEventListener('change', () => applyStyle('showBuoy', showBuoyancyToggle.checked));
+addCustomTextBtn.addEventListener('click', handleAddCustomText);
+
+// Backside Mapping Listeners
+mappingTargetSelect.addEventListener('change', () => {
+    const target = mappingTargetSelect.value;
+    if (!target) {
+        mappingBacksideSelect.disabled = true;
+        mappingBacksideSelect.value = '';
+    } else {
+        mappingBacksideSelect.disabled = false;
+        mappingBacksideSelect.value = backsideMappings[target] || '';
+    }
+});
+
+mappingBacksideSelect.addEventListener('change', () => {
+    const target = mappingTargetSelect.value;
+    if (target) {
+        backsideMappings[target] = mappingBacksideSelect.value;
+    }
+});
 
 // Image Upload Listener
 imageUploadInput.addEventListener('change', handleImageSelection);
@@ -202,7 +238,9 @@ function generateCards() {
     parsedCsvData.forEach(rowData => {
         // Track unique Card_Types for the Styling dropdown
         const type = rowData.Card_Type ? rowData.Card_Type.trim() : 'Uncategorized';
-        const title = rowData.Card_Title ? rowData.Card_Title.trim() : 'Untitled';
+        // Fallback to Card_ID if Card_Title is empty, else Untitled
+        const fallback = rowData.Card_ID ? rowData.Card_ID.trim() : 'Untitled';
+        const title = rowData.Card_Title ? rowData.Card_Title.trim() : fallback;
         if (type) cardCategories.add(type);
         cardTitles.add(title);
 
@@ -213,6 +251,9 @@ function generateCards() {
         for (let q = 0; q < qty; q++) {
             const cardEl = document.createElement('div');
             cardEl.className = 'game-card';
+            if (type.startsWith('Back_')) {
+                cardEl.classList.add('is-backside');
+            }
             cardEl.dataset.category = type; // Critical for targeted styling
             cardEl.dataset.title = title;
 
@@ -236,7 +277,7 @@ function generateCards() {
                 <div class="card-overlay-layer"></div>
                 <div class="card-type-banner"></div>
                 <div class="card-header">
-                    <h3 class="card-title">${escapeHTML(rowData.Card_Title || 'Untitled')}</h3>
+                    <h3 class="card-title">${escapeHTML(title)}</h3>
                     <div class="card-stats">${badgesHTML}</div>
                 </div>
                 
@@ -244,8 +285,8 @@ function generateCards() {
                 
                 <div class="card-body">
                     ${rowData.Standard_Text ? `<div class="card-standard-text">${escapeHTML(rowData.Standard_Text)}</div>` : ''}
-                    ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
                     ${pointsHTML}
+                    ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
                     ${rowData.Mechanic_Action ? `<div class="card-mechanic">${escapeHTML(rowData.Mechanic_Action)}</div>` : ''}
                     ${rowData.Flavor_Text ? `<div class="card-flavor">${escapeHTML(rowData.Flavor_Text).replace(/\n/g, '<br>')}</div>` : ''}
                 </div>
@@ -262,7 +303,25 @@ function generateCards() {
             // Apply existing styles immediately on generation
             applyStoredStyles(cardEl, type, title);
 
-            cardGrid.appendChild(cardEl);
+            if (type.startsWith('Back_')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'card-wrapper';
+                wrapper.style.display = 'flex';
+                wrapper.style.flexDirection = 'column';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '0.5rem';
+
+                const label = document.createElement('div');
+                label.className = 'backside-label';
+                label.textContent = escapeHTML(title);
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(cardEl);
+                cardGrid.appendChild(wrapper);
+            } else {
+                cardGrid.appendChild(cardEl);
+            }
+
             totalCardsGenerated++;
         }
     });
@@ -277,6 +336,7 @@ function generateCards() {
     // Populate dropdown
     updateCategoryDropdown();
     populatePresetDropdown();
+    updateBacksideMapping();
 }
 
 /**
@@ -345,7 +405,7 @@ function updateCategoryDropdown() {
     const catGroup = document.createElement('optgroup');
     catGroup.label = "By Category";
     cardCategories.forEach(cat => {
-        if (!categoryStyles["cat_" + cat]) categoryStyles["cat_" + cat] = { ...categoryStyles["all"] };
+        if (!categoryStyles["cat_" + cat]) categoryStyles["cat_" + cat] = JSON.parse(JSON.stringify(categoryStyles["all"]));
         const opt = document.createElement('option');
         opt.value = "cat_" + cat;
         opt.textContent = `Category: ${cat}`;
@@ -357,7 +417,7 @@ function updateCategoryDropdown() {
     const cardGroup = document.createElement('optgroup');
     cardGroup.label = "Single Individual Cards";
     cardTitles.forEach(title => {
-        if (!categoryStyles["card_" + title]) categoryStyles["card_" + title] = { ...categoryStyles["all"] };
+        if (!categoryStyles["card_" + title]) categoryStyles["card_" + title] = JSON.parse(JSON.stringify(categoryStyles["all"]));
         const opt = document.createElement('option');
         opt.value = "card_" + title;
         opt.textContent = `Card: ${title}`;
@@ -379,6 +439,9 @@ function updateControlsToMatchCategory() {
         bgScaleSlider.value = styles.bgScale !== undefined ? styles.bgScale : "100";
         bgPosXSlider.value = styles.bgPosX !== undefined ? styles.bgPosX : "50";
         bgPosYSlider.value = styles.bgPosY !== undefined ? styles.bgPosY : "50";
+        fgScaleSlider.value = styles.fgScale !== undefined ? styles.fgScale : "100";
+        fgPosXSlider.value = styles.fgPosX !== undefined ? styles.fgPosX : "50";
+        fgPosYSlider.value = styles.fgPosY !== undefined ? styles.fgPosY : "50";
         overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
         overlayOpacitySlider.value = styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0";
         textColorPicker.value = styles.text;
@@ -404,7 +467,11 @@ function updateControlsToMatchCategory() {
         }
 
         // Hide or Show the physical card in the grid
-        card.style.display = shouldShow ? 'flex' : 'none';
+        if (card.parentElement && card.parentElement.classList.contains('card-wrapper')) {
+            card.parentElement.style.display = shouldShow ? 'flex' : 'none';
+        } else {
+            card.style.display = shouldShow ? 'flex' : 'none';
+        }
     });
 
     // Update Accessibility Checker for the newly selected target
@@ -477,6 +544,10 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     if (propName === 'bgPosX') cardDiv.style.setProperty('--dynamic-card-bg-pos-x', `${value}%`);
     if (propName === 'bgPosY') cardDiv.style.setProperty('--dynamic-card-bg-pos-y', `${value}%`);
 
+    if (propName === 'fgScale') cardDiv.style.setProperty('--dynamic-card-fg-size', `${value}%`);
+    if (propName === 'fgPosX') cardDiv.style.setProperty('--dynamic-card-fg-pos-x', `${value}%`);
+    if (propName === 'fgPosY') cardDiv.style.setProperty('--dynamic-card-fg-pos-y', `${value}%`);
+
     if (propName === 'overlayColor' || propName === 'overlayOpacity') {
         const styles = categoryStyles["card_" + cardDiv.dataset.title] || categoryStyles["cat_" + cardDiv.dataset.category] || categoryStyles["all"];
         const hex = propName === 'overlayColor' ? value : (styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff");
@@ -512,6 +583,9 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'bgScale', styles.bgScale !== undefined ? styles.bgScale : '100');
     updateCSSCustomProperty(cardDiv, 'bgPosX', styles.bgPosX !== undefined ? styles.bgPosX : '50');
     updateCSSCustomProperty(cardDiv, 'bgPosY', styles.bgPosY !== undefined ? styles.bgPosY : '50');
+    updateCSSCustomProperty(cardDiv, 'fgScale', styles.fgScale !== undefined ? styles.fgScale : '100');
+    updateCSSCustomProperty(cardDiv, 'fgPosX', styles.fgPosX !== undefined ? styles.fgPosX : '50');
+    updateCSSCustomProperty(cardDiv, 'fgPosY', styles.fgPosY !== undefined ? styles.fgPosY : '50');
     updateCSSCustomProperty(cardDiv, 'overlayColor', styles.overlayColor !== undefined ? styles.overlayColor : '#ffffff');
     updateCSSCustomProperty(cardDiv, 'overlayOpacity', styles.overlayOpacity !== undefined ? styles.overlayOpacity : '0');
     updateCSSCustomProperty(cardDiv, 'text', styles.text);
@@ -520,6 +594,23 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'size', styles.size);
     updateCSSCustomProperty(cardDiv, 'wordBreak', styles.wordBreak);
     updateCSSCustomProperty(cardDiv, 'showBuoy', (styles.showBuoy !== undefined) ? styles.showBuoy : true);
+
+    // Handle Custom Texts
+    const existingTexts = cardDiv.querySelectorAll('.custom-text-element');
+    existingTexts.forEach(el => el.remove());
+
+    const texts = styles.customTexts || [];
+    texts.forEach(txt => {
+        const span = document.createElement('div');
+        span.className = 'custom-text-element';
+        span.dataset.id = txt.id;
+        span.innerText = txt.text;
+        span.style.left = txt.x + '%';
+        span.style.top = txt.y + '%';
+        cardDiv.appendChild(span);
+
+        attachCustomTextEvents(span, cardDiv, txt.id);
+    });
 }
 
 function escapeHTML(str) {
@@ -527,6 +618,154 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[tag]));
+}
+
+function handleAddCustomText() {
+    const target = targetCategory.value;
+    const newText = { id: 'ctx_' + Date.now(), text: 'New Text', x: 50, y: 50 };
+
+    if (!categoryStyles[target]) categoryStyles[target] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+    if (!categoryStyles[target].customTexts) categoryStyles[target].customTexts = [];
+    categoryStyles[target].customTexts.push(newText);
+
+    // Sub-propagation
+    if (target === 'all') {
+        Object.keys(categoryStyles).forEach(key => {
+            if (key !== 'all') {
+                if (!categoryStyles[key].customTexts) categoryStyles[key].customTexts = [];
+                categoryStyles[key].customTexts.push({ ...newText });
+            }
+        });
+    } else if (target.startsWith('cat_')) {
+        const catName = target.substring(4);
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            if (card.dataset.category === catName) {
+                const cardKey = "card_" + card.dataset.title;
+                if (categoryStyles[cardKey]) {
+                    if (!categoryStyles[cardKey].customTexts) categoryStyles[cardKey].customTexts = [];
+                    if (!categoryStyles[cardKey].customTexts.find(t => t.id === newText.id)) {
+                        categoryStyles[cardKey].customTexts.push({ ...newText });
+                    }
+                }
+            }
+        });
+    }
+
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        applyStoredStyles(card, card.dataset.category, card.dataset.title);
+    });
+}
+
+function attachCustomTextEvents(span, cardDiv, txtId) {
+    let isDragging = false;
+
+    span.addEventListener('mousedown', (e) => {
+        if (span.classList.contains('is-editing')) return;
+        isDragging = true;
+        e.stopPropagation();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+
+        const cardRect = cardDiv.getBoundingClientRect();
+        let newX = ((e.clientX - cardRect.left) / cardRect.width) * 100;
+        let newY = ((e.clientY - cardRect.top) / cardRect.height) * 100;
+
+        newX = Math.max(0, Math.min(100, newX));
+        newY = Math.max(0, Math.min(100, newY));
+
+        span.style.left = newX + '%';
+        span.style.top = newY + '%';
+
+        syncCustomTextPosUI(txtId, newX, newY);
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+
+        const newX = parseFloat(span.style.left);
+        const newY = parseFloat(span.style.top);
+
+        const target = targetCategory.value;
+        const styles = categoryStyles[target];
+        if (styles && styles.customTexts) {
+            const txt = styles.customTexts.find(t => t.id === txtId);
+            if (txt) {
+                txt.x = newX;
+                txt.y = newY;
+            }
+        }
+    });
+
+    span.addEventListener('dblclick', (e) => {
+        span.contentEditable = true;
+        span.classList.add('is-editing');
+        span.focus();
+        e.stopPropagation();
+    });
+
+    span.addEventListener('blur', () => {
+        span.contentEditable = false;
+        span.classList.remove('is-editing');
+        const newText = span.innerText;
+
+        syncCustomTextContentUI(txtId, newText);
+
+        const target = targetCategory.value;
+        const styles = categoryStyles[target];
+        if (styles && styles.customTexts) {
+            const txt = styles.customTexts.find(t => t.id === txtId);
+            if (txt) txt.text = newText;
+        }
+    });
+
+    span.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            span.blur();
+        }
+    });
+}
+
+function syncCustomTextPosUI(id, newX, newY) {
+    const target = targetCategory.value;
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        let shouldSync = false;
+        if (target === 'all') shouldSync = true;
+        else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+
+        if (shouldSync) {
+            const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
+            if (el) {
+                el.style.left = newX + '%';
+                el.style.top = newY + '%';
+            }
+        }
+    });
+}
+
+function syncCustomTextContentUI(id, newText) {
+    const target = targetCategory.value;
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        let shouldSync = false;
+        if (target === 'all') shouldSync = true;
+        else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+
+        if (shouldSync) {
+            const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
+            if (el && el !== document.activeElement) {
+                el.innerText = newText;
+            }
+        }
+    });
 }
 
 /**
@@ -876,5 +1115,158 @@ async function handleImportPreset(event) {
         }
     };
     reader.readAsText(file);
+}
+
+/**
+ * --- Backside Mapping & Print Layout Logic ---
+ */
+function updateBacksideMapping() {
+    mappingTargetSelect.innerHTML = '<option value="">-- Select Target --</option>';
+    mappingBacksideSelect.innerHTML = '<option value="">-- None --</option>';
+    mappingBacksideSelect.disabled = true;
+
+    const frontCategories = Array.from(cardCategories);
+    const allTitles = new Set();
+
+    parsedCsvData.forEach(row => {
+        const fallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
+        const title = row.Card_Title ? row.Card_Title.trim() : fallback;
+        allTitles.add(title);
+    });
+
+    if (frontCategories.length === 0 || allTitles.size === 0) {
+        mappingSection.style.display = 'none';
+        mappingDivider.style.display = 'none';
+        return;
+    }
+
+    mappingSection.style.display = 'flex';
+    mappingDivider.style.display = 'block';
+
+    // Populate Targets (Categories)
+    const catGroup = document.createElement('optgroup');
+    catGroup.label = "By Category";
+    frontCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = "cat_" + cat;
+        opt.textContent = `Category: ${cat}`;
+        catGroup.appendChild(opt);
+    });
+    mappingTargetSelect.appendChild(catGroup);
+
+    // Populate Targets (Individual Cards)
+    const cardGroup = document.createElement('optgroup');
+    cardGroup.label = "Single Individual Cards";
+    allTitles.forEach(title => {
+        const opt = document.createElement('option');
+        opt.value = "card_" + title;
+        opt.textContent = `Card: ${title}`;
+        cardGroup.appendChild(opt);
+    });
+    mappingTargetSelect.appendChild(cardGroup);
+
+    // Populate Backsides
+    allTitles.forEach(bt => {
+        const opt = document.createElement('option');
+        opt.value = bt;
+        opt.textContent = bt;
+        mappingBacksideSelect.appendChild(opt);
+    });
+}
+
+function generatePrintLayout() {
+    const layout = document.getElementById('printLayout');
+    layout.innerHTML = '';
+
+    // 1. Gather all currently visible front cards from the grid in order
+    const visibleCards = Array.from(document.querySelectorAll('#cardGrid .game-card')).filter(c => {
+        if (c.parentElement && c.parentElement.classList.contains('card-wrapper')) {
+            return c.parentElement.style.display !== 'none';
+        }
+        return c.style.display !== 'none';
+    });
+
+    if (visibleCards.length === 0) {
+        alert("No visible cards to print.");
+        return;
+    }
+
+    // Determine if we need to do double sided printing based on whether any mappings exist
+    const hasAnyMapping = Object.values(backsideMappings).some(v => v !== '');
+
+    // 2. Chunk them into pages of 9
+    for (let i = 0; i < visibleCards.length; i += 9) {
+        const chunk = visibleCards.slice(i, i + 9);
+
+        // --- Create Front Page ---
+        const frontPage = document.createElement('div');
+        frontPage.className = 'print-page';
+
+        chunk.forEach(card => {
+            const clonedCard = card.cloneNode(true);
+            frontPage.appendChild(clonedCard);
+        });
+
+        // Pad the front page with empty cards if less than 9 to maintain grid structure
+        while (frontPage.children.length < 9) {
+            const emptyCard = document.createElement('div');
+            emptyCard.className = 'game-card';
+            emptyCard.style.visibility = 'hidden';
+            frontPage.appendChild(emptyCard);
+        }
+
+        layout.appendChild(frontPage);
+
+        // --- Create Back Page ---
+        // We only generate a back page if mappings exist AND the chunk contains front cards
+        const chunkHasFrontCards = chunk.some(c => !c.classList.contains('is-backside'));
+
+        if (hasAnyMapping && chunkHasFrontCards) {
+            const backPage = document.createElement('div');
+            backPage.className = 'print-page';
+
+            // Mirror logic for duplex alignment
+            // Top row: 0 1 2 -> 2 1 0
+            // Mid row: 3 4 5 -> 5 4 3
+            // Bot row: 6 7 8 -> 8 7 6
+            const mirrorIndices = [2, 1, 0, 5, 4, 3, 8, 7, 6];
+            const backCardsArray = new Array(9).fill(null);
+
+            chunk.forEach((frontCard, index) => {
+                const cat = frontCard.dataset.category;
+                const title = frontCard.dataset.title;
+                const mappedBackTitle = backsideMappings["card_" + title] || backsideMappings["cat_" + cat];
+
+                let backNodeToUse = null;
+                if (mappedBackTitle) {
+                    const existingBackCard = document.querySelector(`.game-card[data-title="${CSS.escape(mappedBackTitle)}"]`);
+                    if (existingBackCard) {
+                        backNodeToUse = existingBackCard.cloneNode(true);
+                        backNodeToUse.style.display = 'flex'; // Ensure it's not hidden
+                    }
+                }
+
+                const mirrorIndex = mirrorIndices[index];
+                backCardsArray[mirrorIndex] = backNodeToUse;
+            });
+
+            // Append back cards in mirrored order
+            backCardsArray.forEach(bNode => {
+                if (bNode) {
+                    backPage.appendChild(bNode);
+                } else {
+                    const emptyCard = document.createElement('div');
+                    emptyCard.className = 'game-card';
+                    emptyCard.style.visibility = 'hidden';
+                    backPage.appendChild(emptyCard);
+                }
+            });
+
+            layout.appendChild(backPage);
+        }
+    }
+
+    // Trigger native print flow
+    window.print();
 }
 
