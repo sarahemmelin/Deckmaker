@@ -223,7 +223,7 @@ body {
 .color-picker-wrapper input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
-    border: none;
+    border: 1px solid var(--border-color);
     width: 24px;
     height: 24px;
     border-radius: 0.25rem;
