@@ -163,6 +163,50 @@ body {
     font-weight: 500;
 }
 
+/* Accordions */
+.style-accordion {
+    width: 100%;
+}
+
+.style-accordion summary {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    list-style: none;
+    /* Hide default arrow in standard browsers */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    padding: 0.25rem 0;
+}
+
+.style-accordion summary::after {
+    content: '+';
+    font-size: 1.1rem;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.style-accordion[open] summary::after {
+    content: '−';
+}
+
+.style-accordion summary::-webkit-details-marker {
+    display: none;
+    /* Hide arrow in Safari */
+}
+
+.accordion-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 0 0.25rem 0;
+}
+
 .style-select {
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;

@@ -100,160 +100,173 @@
                 <h3>Frontside Mapping</h3>
 
                 <div class="style-field">
-                    <label for="targetCategory">Target Category:</label>
+                    <label for="targetCategory" style="font-weight: bold; color: var(--text-primary);">Target
+                        Select:</label>
                     <select id="targetCategory" class="style-select">
                         <option value="all">All Cards</option>
                         <!-- Options generated dynamically based on Card_Type -->
                     </select>
                 </div>
 
-                <div class="style-field">
-                    <label for="bgColorPicker">Background Color:</label>
-                    <div class="color-picker-wrapper">
-                        <input type="color" id="bgColorPicker" value="#ffffff">
-                    </div>
-                </div>
-
-                <div class="style-field">
-                    <label for="bgImageUpload">Background Texture:</label>
-                    <div style="display: flex; gap: 0.5rem; width: 100%; align-items: center;">
-                        <input type="file" id="bgImageUpload" accept="image/png, image/jpeg"
-                            style="width: 120px; font-size: 0.75rem;">
-                        <button id="removeBgImageBtn" class="secondary-btn"
-                            style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                            title="Remove background texture">Remove</button>
-                    </div>
-                </div>
-
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="bgScaleSlider">Texture Scale (%):</label>
-                    <input type="range" id="bgScaleSlider" min="10" max="300" step="1" value="100" style="width: 100%;">
-                </div>
-
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="bgPosXSlider">Texture Pos X (%):</label>
-                    <input type="range" id="bgPosXSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
-                </div>
-
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="bgPosYSlider">Texture Pos Y (%):</label>
-                    <input type="range" id="bgPosYSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
-                </div>
-
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
-                <h4
-                    style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.25rem; margin-bottom: 0.25rem;">
-                    Illustration Adjustments</h4>
 
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="fgScaleSlider">Image Scale (%):</label>
-                    <input type="range" id="fgScaleSlider" min="10" max="300" step="1" value="100" style="width: 100%;">
-                </div>
+                <details class="style-accordion" open>
+                    <summary>Background & Overlay</summary>
+                    <div class="accordion-content">
+                        <div class="style-field">
+                            <label for="bgColorPicker">Background Color:</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="bgColorPicker" value="#ffffff">
+                            </div>
+                        </div>
 
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="fgPosXSlider">Image Pos X (%):</label>
-                    <input type="range" id="fgPosXSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
-                </div>
+                        <div class="style-field">
+                            <label for="bgImageUpload">Background Texture:</label>
+                            <div style="display: flex; gap: 0.5rem; width: 100%; align-items: center;">
+                                <input type="file" id="bgImageUpload" accept="image/png, image/jpeg"
+                                    style="width: 120px; font-size: 0.75rem;">
+                                <button id="removeBgImageBtn" class="secondary-btn"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                    title="Remove background texture">Remove</button>
+                            </div>
+                        </div>
 
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="fgPosYSlider">Image Pos Y (%):</label>
-                    <input type="range" id="fgPosYSlider" min="0" max="100" step="1" value="50" style="width: 100%;">
-                </div>
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="bgScaleSlider">Texture Scale (%):</label>
+                            <input type="range" id="bgScaleSlider" min="10" max="300" step="1" value="100"
+                                style="width: 100%;">
+                        </div>
 
-                <div class="style-field">
-                    <label for="overlayColorPicker">Overlay Color:</label>
-                    <div class="color-picker-wrapper">
-                        <input type="color" id="overlayColorPicker" value="#ffffff">
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="bgPosXSlider">Texture Pos X (%):</label>
+                            <input type="range" id="bgPosXSlider" min="0" max="100" step="1" value="50"
+                                style="width: 100%;">
+                        </div>
+
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="bgPosYSlider">Texture Pos Y (%):</label>
+                            <input type="range" id="bgPosYSlider" min="0" max="100" step="1" value="50"
+                                style="width: 100%;">
+                        </div>
+
+                        <div class="style-field">
+                            <label for="overlayColorPicker">Overlay Color:</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="overlayColorPicker" value="#ffffff">
+                            </div>
+                        </div>
+
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="overlayOpacitySlider">Overlay Opacity:</label>
+                            <input type="range" id="overlayOpacitySlider" min="0" max="1" step="0.05" value="0"
+                                style="width: 100%;">
+                        </div>
                     </div>
-                </div>
-
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="overlayOpacitySlider">Overlay Opacity:</label>
-                    <input type="range" id="overlayOpacitySlider" min="0" max="1" step="0.05" value="0"
-                        style="width: 100%;">
-                </div>
-
-                <div class="style-field">
-                    <label for="textColorPicker">Text Color:</label>
-                    <div class="color-picker-wrapper">
-                        <input type="color" id="textColorPicker" value="#111827">
-                    </div>
-                </div>
-
-                <div class="style-field">
-                    <label for="accentColorPicker">Accent Fill (Icon/Border):</label>
-                    <div class="color-picker-wrapper">
-                        <input type="color" id="accentColorPicker" value="#1f2937">
-                    </div>
-                </div>
+                </details>
 
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
 
-                <!-- Accessibility Checker -->
-                <div class="a11y-checker" id="a11yChecker">
-                    <div class="a11y-header">
-                        <span class="material-icons" id="a11yIcon">check_circle</span>
-                        <span id="a11yStatus">Contrast: Excellent</span>
+                <details class="style-accordion">
+                    <summary>Imagery & Layout</summary>
+                    <div class="accordion-content">
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="fgScaleSlider">Image Scale (%):</label>
+                            <input type="range" id="fgScaleSlider" min="10" max="300" step="1" value="100"
+                                style="width: 100%;">
+                        </div>
+
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="fgPosXSlider">Image Pos X (%):</label>
+                            <input type="range" id="fgPosXSlider" min="0" max="100" step="1" value="50"
+                                style="width: 100%;">
+                        </div>
+
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="fgPosYSlider">Image Pos Y (%):</label>
+                            <input type="range" id="fgPosYSlider" min="0" max="100" step="1" value="50"
+                                style="width: 100%;">
+                        </div>
+
+                        <div class="style-field">
+                            <label for="showBuoyancyToggle">Show Buoyancy Badge:</label>
+                            <input type="checkbox" id="showBuoyancyToggle" checked>
+                        </div>
                     </div>
-                    <div class="a11y-details" id="a11yDetails">
-                        Print contrast ratio: <span id="a11yRatio">12.5:1</span> (Simulated 15% darker)
-                    </div>
-                </div>
+                </details>
 
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
 
-                <div class="style-field">
-                    <label for="fontFamilySelect">Font Family:</label>
-                    <select id="fontFamilySelect" class="style-select">
-                        <option value="'Inter', sans-serif">Inter (Modern)</option>
-                        <option value="'Roboto', sans-serif">Roboto</option>
-                        <option value="'Montserrat', sans-serif">Montserrat</option>
-                        <option value="'Oswald', sans-serif">Oswald</option>
-                        <option value="'Playfair Display', serif">Playfair Display</option>
-                        <option value="'Georgia', serif">Georgia (Classic)</option>
-                        <option value="'Courier New', monospace">Courier (Tech)</option>
-                        <option value="'Impact', sans-serif">Impact (Bold)</option>
-                        <option value="'Arial', sans-serif">Arial</option>
-                    </select>
-                </div>
+                <details class="style-accordion">
+                    <summary>Typography & Colors</summary>
+                    <div class="accordion-content">
+                        <div class="style-field">
+                            <label for="fontFamilySelect">Font Family:</label>
+                            <select id="fontFamilySelect" class="style-select">
+                                <option value="'Inter', sans-serif">Inter (Modern)</option>
+                                <option value="'Roboto', sans-serif">Roboto</option>
+                                <option value="'Montserrat', sans-serif">Montserrat</option>
+                                <option value="'Oswald', sans-serif">Oswald</option>
+                                <option value="'Playfair Display', serif">Playfair Display</option>
+                                <option value="'Georgia', serif">Georgia (Classic)</option>
+                                <option value="'Courier New', monospace">Courier (Tech)</option>
+                                <option value="'Impact', sans-serif">Impact (Bold)</option>
+                                <option value="'Arial', sans-serif">Arial</option>
+                            </select>
+                        </div>
 
-                <div class="style-field"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
-                    <label for="fontSizeSlider">Base Font Size:</label>
-                    <input type="range" id="fontSizeSlider" min="0.1" max="4.0" step="0.05" value="1"
-                        style="width: 100%;">
-                </div>
+                        <div class="style-field"
+                            style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="fontSizeSlider">Base Font Size:</label>
+                            <input type="range" id="fontSizeSlider" min="0.1" max="4.0" step="0.05" value="1"
+                                style="width: 100%;">
+                        </div>
 
-                <div class="style-field">
-                    <label for="wordBreakToggle">Force Word Break:</label>
-                    <input type="checkbox" id="wordBreakToggle">
-                </div>
+                        <div class="style-field">
+                            <label for="textColorPicker">Text Color:</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="textColorPicker" value="#111827">
+                            </div>
+                        </div>
 
-                <div class="style-field">
-                    <label for="showBuoyancyToggle">Show Buoyancy Badge:</label>
-                    <input type="checkbox" id="showBuoyancyToggle" checked>
-                </div>
+                        <div class="style-field">
+                            <label for="accentColorPicker">Accent Fill (Icon/Border):</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="accentColorPicker" value="#1f2937">
+                            </div>
+                        </div>
+
+                        <div class="style-field">
+                            <label for="wordBreakToggle">Force Word Break:</label>
+                            <input type="checkbox" id="wordBreakToggle">
+                        </div>
+                    </div>
+                </details>
 
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
-                <h4
-                    style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.25rem; margin-bottom: 0.25rem;">
-                    Custom Text Elements</h4>
-                <div class="style-field">
-                    <button id="addCustomTextBtn" class="secondary-btn"
-                        style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;">
-                        <span class="material-icons btn-icon" style="font-size: 1rem;">add_circle_outline</span> Add
-                        Text Element
-                    </button>
-                </div>
-                <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; text-align: center;">
-                    Double-click to edit, drag to move. Delete all text to remove.</p>
+
+                <details class="style-accordion">
+                    <summary>Custom Elements</summary>
+                    <div class="accordion-content">
+                        <div class="style-field">
+                            <button id="addCustomTextBtn" class="secondary-btn"
+                                style="padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;">
+                                <span class="material-icons btn-icon" style="font-size: 1rem;">add_circle_outline</span>
+                                Add
+                                Text Element
+                            </button>
+                        </div>
+                        <p
+                            style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; text-align: center;">
+                            Double-click to edit, drag to move. Delete all text to remove.</p>
+                    </div>
+                </details>
             </div>
 
             <div class="control-group action-group">

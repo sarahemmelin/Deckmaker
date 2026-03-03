@@ -705,13 +705,19 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
         span.contentEditable = true;
         span.classList.add('is-editing');
         span.focus();
+        // Select all text when double clicked
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
         e.stopPropagation();
     });
 
     span.addEventListener('blur', () => {
         span.contentEditable = false;
         span.classList.remove('is-editing');
-        const newText = span.innerText.trim();
+        const newText = span.textContent.trim();
 
         if (newText === '') {
             removeCustomText(txtId);
