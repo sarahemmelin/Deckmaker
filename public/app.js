@@ -391,6 +391,9 @@ function generateCards() {
                 startX = e.clientX;
                 startY = e.clientY;
 
+                // Auto-select this card so image manipulations are strictly localized
+                selectCardTarget(title);
+
                 // Read current values
                 const currentX = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-x')) || 50;
                 const currentY = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-y')) || 50;
@@ -454,6 +457,9 @@ function generateCards() {
                 if (!imgPlaceholder.classList.contains('has-image')) return;
                 e.preventDefault();
 
+                // Auto-select this card so image manipulations are strictly localized
+                selectCardTarget(title);
+
                 const currentScale = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-size')) || 100;
 
                 // Zoom direction
@@ -506,13 +512,7 @@ function generateCards() {
 
                 // Allow clicking the backside label to select it since the card itself is often filled with draggable images
                 label.addEventListener('click', (e) => {
-                    const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
-                    if (exactCardOpt) {
-                        targetCategory.value = exactCardOpt.value;
-                        targetCategory.dispatchEvent(new Event('change'));
-                        const sidebar = document.querySelector('.sidebar');
-                        if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
+                    selectCardTarget(title);
                 });
 
                 wrapper.appendChild(label);
@@ -528,16 +528,7 @@ function generateCards() {
                 if (e.target.closest('.card-image-placeholder') || e.target.closest('.custom-text-element')) return;
 
                 // Select this exact card in the dropdown
-                const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
-                if (exactCardOpt) {
-                    targetCategory.value = exactCardOpt.value;
-                    // Procces the change to update UI sliders
-                    targetCategory.dispatchEvent(new Event('change'));
-
-                    // Scroll sidebar to top so user sees the newly expanded controls
-                    const sidebar = document.querySelector('.sidebar');
-                    if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
-                }
+                selectCardTarget(title);
             });
 
             totalCardsGenerated++;
@@ -629,6 +620,19 @@ async function handleImageSelection(event) {
 /**
  * --- Bulk Styling & Targeting Logic ---
  */
+function selectCardTarget(title) {
+    const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
+    if (exactCardOpt) {
+        // Only trigger DOM update if it's an actual change, to prevent jitter
+        if (targetCategory.value !== exactCardOpt.value) {
+            targetCategory.value = exactCardOpt.value;
+            targetCategory.dispatchEvent(new Event('change'));
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+}
+
 function updateCategoryDropdown() {
     targetCategory.innerHTML = '<option value="all">All Cards</option>';
 
