@@ -169,13 +169,35 @@ removeBgImageBtn.addEventListener('click', () => {
     applyStyle('bgImage', 'none');
     bgImageUpload.value = '';
 });
-bgScaleSlider.addEventListener('input', () => applyStyle('bgScale', bgScaleSlider.value));
-bgPosXSlider.addEventListener('input', () => applyStyle('bgPosX', bgPosXSlider.value));
-bgPosYSlider.addEventListener('input', () => applyStyle('bgPosY', bgPosYSlider.value));
-fgScaleSlider.addEventListener('input', () => applyStyle('fgScale', fgScaleSlider.value));
-fgPosXSlider.addEventListener('input', () => applyStyle('fgPosX', fgPosXSlider.value));
-fgPosYSlider.addEventListener('input', () => applyStyle('fgPosY', fgPosYSlider.value));
-overlayOpacitySlider.addEventListener('input', () => applyStyle('overlayOpacity', overlayOpacitySlider.value));
+
+// Dynamic Range Track Slider Background updates
+function updateSliderBackground(slider) {
+    const min = parseFloat(slider.min) || 0;
+    const max = parseFloat(slider.max) || 100;
+    const val = parseFloat(slider.value);
+    const percentage = ((val - min) / (max - min)) * 100;
+    slider.style.background = `linear-gradient(to right, #005fb2 0%, #005fb2 ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+}
+
+function bindSlider(slider, propertyName) {
+    // Initial paint
+    updateSliderBackground(slider);
+
+    slider.addEventListener('input', () => {
+        applyStyle(propertyName, slider.value);
+        updateSliderBackground(slider);
+    });
+}
+
+// Bind all sliders with visual tracks
+bindSlider(bgScaleSlider, 'bgScale');
+bindSlider(bgPosXSlider, 'bgPosX');
+bindSlider(bgPosYSlider, 'bgPosY');
+bindSlider(fgScaleSlider, 'fgScale');
+bindSlider(fgPosXSlider, 'fgPosX');
+bindSlider(fgPosYSlider, 'fgPosY');
+bindSlider(overlayOpacitySlider, 'overlayOpacity');
+bindSlider(fontSizeSlider, 'size');
 
 fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilySelect.value));
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
@@ -417,6 +439,8 @@ function generateCards() {
                         categoryStyles[tCategory].fgPosY = newY;
                         fgPosXSlider.value = newX;
                         fgPosYSlider.value = newY;
+                        updateSliderBackground(fgPosXSlider);
+                        updateSliderBackground(fgPosYSlider);
                         resetPresetButtons();
                     }
                 }
@@ -450,6 +474,7 @@ function generateCards() {
                 if (shouldSave && categoryStyles[tCategory]) {
                     categoryStyles[tCategory].fgScale = newScale;
                     fgScaleSlider.value = newScale;
+                    updateSliderBackground(fgScaleSlider);
                     resetPresetButtons();
                 }
             });
@@ -648,6 +673,16 @@ function updateControlsToMatchCategory() {
         fontSizeSlider.value = styles.size;
         wordBreakToggle.checked = styles.wordBreak;
         showBuoyancyToggle.checked = (styles.showBuoy !== undefined) ? styles.showBuoy : true;
+
+        // Repaint styling on all range tracks now that values shifted
+        updateSliderBackground(bgScaleSlider);
+        updateSliderBackground(bgPosXSlider);
+        updateSliderBackground(bgPosYSlider);
+        updateSliderBackground(fgScaleSlider);
+        updateSliderBackground(fgPosXSlider);
+        updateSliderBackground(fgPosYSlider);
+        updateSliderBackground(overlayOpacitySlider);
+        updateSliderBackground(fontSizeSlider);
     }
 
     // 2. Filter the UI Grid to ONLY show the targeted cards
