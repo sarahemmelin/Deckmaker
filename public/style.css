@@ -492,11 +492,10 @@ button:disabled {
    VISUAL GAME CARD SPECIFICS
    ========================================= */
 .game-card {
-    width: var(--card-width);
-    height: var(--card-height);
-    background-color: transparent;
-    color: var(--dynamic-card-text);
-    border: 1px solid #e5e7eb;
+    width: 2.5in;
+    height: 3.5in;
+    background-color: var(--dynamic-card-bg);
+    border: 1px solid var(--border-color);
     border-radius: 0.375rem;
     box-shadow: var(--shadow-lg);
     position: relative;
@@ -508,7 +507,12 @@ button:disabled {
     padding: 0.15in;
     font-family: var(--dynamic-card-font);
     font-size: var(--dynamic-card-size);
-    transition: color 0.2s, font-size 0.2s;
+    transition: color 0.2s, font-size 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.game-card.is-selected {
+    box-shadow: 0 0 0 4px var(--primary-color);
+    border-color: var(--primary-color);
 }
 
 /* Backside Card Simplify */
@@ -526,11 +530,29 @@ button:disabled {
 
 /* User-stylable text label above backside cards in the UI */
 .backside-label {
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-secondary);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
     text-align: center;
-    width: 100%;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.backside-label:hover {
+    background-color: var(--primary-color);
+    color: white;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.backside-label:active {
+    transform: translateY(0);
 }
 
 .game-card.is-backside .card-image-placeholder {

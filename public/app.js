@@ -109,9 +109,9 @@ presetSelect.addEventListener('change', () => {
 });
 
 // Styling Listeners
-// Styling Listeners
 targetCategory.addEventListener('change', () => {
     updateControlsToMatchCategory();
+    highlightSelectedCard();
     if (targetCategory.value === 'all') {
         backToAllBtn.style.display = 'none';
     } else {
@@ -502,6 +502,18 @@ function generateCards() {
                 const label = document.createElement('div');
                 label.className = 'backside-label';
                 label.textContent = escapeHTML(title);
+                label.title = "Click to selectively style this exact card";
+
+                // Allow clicking the backside label to select it since the card itself is often filled with draggable images
+                label.addEventListener('click', (e) => {
+                    const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
+                    if (exactCardOpt) {
+                        targetCategory.value = exactCardOpt.value;
+                        targetCategory.dispatchEvent(new Event('change'));
+                        const sidebar = document.querySelector('.sidebar');
+                        if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                });
 
                 wrapper.appendChild(label);
                 wrapper.appendChild(cardEl);
@@ -624,7 +636,10 @@ function updateCategoryDropdown() {
     const catGroup = document.createElement('optgroup');
     catGroup.label = "By Category";
     cardCategories.forEach(cat => {
-        if (!categoryStyles["cat_" + cat]) categoryStyles["cat_" + cat] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+        // Only clone if missing and not a backside
+        if (!categoryStyles["cat_" + cat] && !cat.startsWith('Back_')) {
+            categoryStyles["cat_" + cat] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+        }
         const opt = document.createElement('option');
         opt.value = "cat_" + cat;
         opt.textContent = `Category: ${cat}`;
@@ -636,13 +651,38 @@ function updateCategoryDropdown() {
     const cardGroup = document.createElement('optgroup');
     cardGroup.label = "Single Individual Cards";
     cardTitles.forEach(title => {
-        if (!categoryStyles["card_" + title]) categoryStyles["card_" + title] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+        const isBackside = Array.from(cardCategories).some(cat => cat.startsWith('Back_') && document.querySelector(`.game-card[data-title="${title}"]`)?.dataset.category === cat);
+        // Only deep clone inherited "all" texts if it is a frontside card
+        if (!categoryStyles["card_" + title] && !isBackside) {
+            categoryStyles["card_" + title] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+        } else if (!categoryStyles["card_" + title] && isBackside) {
+            // Blank slate for backsides since they exclude 'all' inherited texts
+            categoryStyles["card_" + title] = { customTexts: [] };
+        }
+
         const opt = document.createElement('option');
         opt.value = "card_" + title;
         opt.textContent = `Card: ${title}`;
         cardGroup.appendChild(opt);
     });
     targetCategory.appendChild(cardGroup);
+
+    highlightSelectedCard();
+}
+
+function highlightSelectedCard() {
+    const target = targetCategory.value;
+    const allCards = document.querySelectorAll('.game-card');
+
+    allCards.forEach(card => {
+        // Remove from all
+        card.classList.remove('is-selected');
+
+        // Add if specifically targeted
+        if (target === `card_${card.dataset.title}`) {
+            card.classList.add('is-selected');
+        }
+    });
 }
 
 function updateControlsToMatchCategory() {
@@ -834,10 +874,21 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
 }
 
 function applyStoredStyles(cardDiv, category, title) {
-    // Single Card settings take precedence, then Category, then globally 'all'
-    let styles = categoryStyles["card_" + title] || categoryStyles["cat_" + category] || categoryStyles["all"];
+    const isBackside = category.startsWith('Back_');
+    const baseGlobal = categoryStyles["all"] || {};
+    const baseCat = categoryStyles["cat_" + category] || {};
+    const baseCard = categoryStyles["card_" + title] || {};
 
-    updateCSSCustomProperty(cardDiv, 'bg', styles.bg);
+    let styles;
+    if (isBackside) {
+        // Backsides do not inherit from 'all'. They start blank, inherit category, then card overrides.
+        styles = { ...baseCat, ...baseCard };
+    } else {
+        // Frontsides inherit from 'all', then category, then card overrides.
+        styles = { ...baseGlobal, ...baseCat, ...baseCard };
+    }
+
+    updateCSSCustomProperty(cardDiv, 'bg', styles.bg !== undefined ? styles.bg : '#ffffff');
     updateCSSCustomProperty(cardDiv, 'bgImage', styles.bgImage !== undefined ? styles.bgImage : 'none');
     updateCSSCustomProperty(cardDiv, 'bgScale', styles.bgScale !== undefined ? styles.bgScale : '100');
     updateCSSCustomProperty(cardDiv, 'bgPosX', styles.bgPosX !== undefined ? styles.bgPosX : '50');
@@ -849,11 +900,11 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'fgPosY', styles.fgPosY !== undefined ? styles.fgPosY : '50');
     updateCSSCustomProperty(cardDiv, 'overlayColor', styles.overlayColor !== undefined ? styles.overlayColor : '#ffffff');
     updateCSSCustomProperty(cardDiv, 'overlayOpacity', styles.overlayOpacity !== undefined ? styles.overlayOpacity : '0');
-    updateCSSCustomProperty(cardDiv, 'text', styles.text);
-    updateCSSCustomProperty(cardDiv, 'accent', styles.accent);
-    updateCSSCustomProperty(cardDiv, 'font', styles.font);
-    updateCSSCustomProperty(cardDiv, 'size', styles.size);
-    updateCSSCustomProperty(cardDiv, 'wordBreak', styles.wordBreak);
+    updateCSSCustomProperty(cardDiv, 'text', styles.text !== undefined ? styles.text : '#111827');
+    updateCSSCustomProperty(cardDiv, 'accent', styles.accent !== undefined ? styles.accent : '#1f2937');
+    updateCSSCustomProperty(cardDiv, 'font', styles.font !== undefined ? styles.font : "'Inter', sans-serif");
+    updateCSSCustomProperty(cardDiv, 'size', styles.size !== undefined ? styles.size : '1');
+    updateCSSCustomProperty(cardDiv, 'wordBreak', styles.wordBreak !== undefined ? styles.wordBreak : false);
     updateCSSCustomProperty(cardDiv, 'showBuoy', (styles.showBuoy !== undefined) ? styles.showBuoy : true);
 
     // Handle Custom Texts
