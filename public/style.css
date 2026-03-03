@@ -440,6 +440,11 @@ button:disabled {
     /* Transformation offsets to center text on X/Y percentage */
     transform: translate(-50%, -50%);
     font-weight: 600;
+    color: var(--dynamic-card-text);
+    text-align: center;
+    white-space: pre-wrap;
+    min-width: 20px;
+    min-height: 1.5em;
 }
 
 .custom-text-element:hover {

@@ -711,26 +711,29 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
     span.addEventListener('blur', () => {
         span.contentEditable = false;
         span.classList.remove('is-editing');
-        const newText = span.innerText;
+        const newText = span.innerText.trim();
 
-        syncCustomTextContentUI(txtId, newText);
+        if (newText === '') {
+            removeCustomText(txtId);
+        } else {
+            syncCustomTextContentUI(txtId, newText);
 
-        const target = targetCategory.value;
-        const styles = categoryStyles[target];
-        if (styles && styles.customTexts) {
-            const txt = styles.customTexts.find(t => t.id === txtId);
-            if (txt) txt.text = newText;
+            const target = targetCategory.value;
+            const styles = categoryStyles[target];
+            if (styles && styles.customTexts) {
+                const txt = styles.customTexts.find(t => t.id === txtId);
+                if (txt) txt.text = newText;
+            }
         }
     });
 
     span.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             span.blur();
-        } else if ((e.key === 'Backspace' || e.key === 'Delete') && span.innerText === '') {
-            // Prevent default to avoid navigating back in some browsers if it's empty
+        } else if (e.key === 'Escape') {
             e.preventDefault();
-            removeCustomText(txtId);
+            span.blur();
         }
     });
 }
