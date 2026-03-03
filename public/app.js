@@ -422,6 +422,24 @@ function generateCards() {
                 cardGrid.appendChild(cardEl);
             }
 
+            // Click-to-Select Card logic
+            cardEl.addEventListener('click', (e) => {
+                // Ignore clicks on images or custom texts so we don't interrupt uploads/drags
+                if (e.target.closest('.card-image-placeholder') || e.target.closest('.custom-text-element')) return;
+
+                // Select this exact card in the dropdown
+                const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
+                if (exactCardOpt) {
+                    targetCategory.value = exactCardOpt.value;
+                    // Procces the change to update UI sliders
+                    targetCategory.dispatchEvent(new Event('change'));
+
+                    // Scroll sidebar to top so user sees the newly expanded controls
+                    const sidebar = document.querySelector('.sidebar');
+                    if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+
             totalCardsGenerated++;
         }
     });
