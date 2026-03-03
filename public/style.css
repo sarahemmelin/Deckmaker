@@ -220,24 +220,70 @@ body {
     width: 120px;
 }
 
-.color-picker-wrapper input[type="color"] {
+.lightning-color-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.color-swatch-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 3.5rem;
+    height: 38px;
+    padding: 0 0.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    background-color: white;
+    cursor: pointer;
+}
+
+.color-swatch-wrapper input[type="color"] {
     -webkit-appearance: none;
     appearance: none;
-    border: 1px solid var(--border-color);
-    width: 24px;
-    height: 24px;
+    border: none;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 0.25rem;
     cursor: pointer;
     padding: 0;
+    margin-left: 0.125rem;
 }
 
-.color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+.color-swatch-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
     padding: 0;
 }
 
-.color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+.color-swatch-wrapper input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 0.25rem;
+}
+
+.color-swatch-wrapper .dropdown-icon {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    pointer-events: none;
+    /* Let clicks pass through to label/input */
+}
+
+.color-text-input {
+    flex: 1;
+    height: 38px;
+    padding: 0 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 0.25rem;
+    font-family: inherit;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.color-text-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color);
 }
 
 /* Accessibility Checker */

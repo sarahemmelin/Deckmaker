@@ -24,6 +24,7 @@ const stylingSection = document.getElementById('stylingSection');
 // Styling Selectors
 const targetCategory = document.getElementById('targetCategory');
 const bgColorPicker = document.getElementById('bgColorPicker');
+const bgColorText = document.getElementById('bgColorText');
 const bgImageUpload = document.getElementById('bgImageUpload');
 const removeBgImageBtn = document.getElementById('removeBgImageBtn');
 const bgScaleSlider = document.getElementById('bgScaleSlider');
@@ -33,9 +34,12 @@ const fgScaleSlider = document.getElementById('fgScaleSlider');
 const fgPosXSlider = document.getElementById('fgPosXSlider');
 const fgPosYSlider = document.getElementById('fgPosYSlider');
 const overlayColorPicker = document.getElementById('overlayColorPicker');
+const overlayColorText = document.getElementById('overlayColorText');
 const overlayOpacitySlider = document.getElementById('overlayOpacitySlider');
 const textColorPicker = document.getElementById('textColorPicker');
+const textColorText = document.getElementById('textColorText');
 const accentColorPicker = document.getElementById('accentColorPicker');
+const accentColorText = document.getElementById('accentColorText');
 const fontFamilySelect = document.getElementById('fontFamilySelect');
 const fontSizeSlider = document.getElementById('fontSizeSlider');
 const wordBreakToggle = document.getElementById('wordBreakToggle');
@@ -101,8 +105,47 @@ presetSelect.addEventListener('change', () => {
 });
 
 // Styling Listeners
+// Styling Listeners
 targetCategory.addEventListener('change', updateControlsToMatchCategory);
-bgColorPicker.addEventListener('input', () => applyStyle('bg', bgColorPicker.value));
+
+// Color Picker Helpers
+function syncColorInput(picker, textInput, property) {
+    // When swatch changes, update text and apply globally
+    picker.addEventListener('input', () => {
+        textInput.value = picker.value;
+        applyStyle(property, picker.value);
+    });
+
+    // When text changes, validate hex, update swatch and apply globally
+    const handleTextChange = () => {
+        let val = textInput.value.trim();
+        // Add hash if missing
+        if (val && !val.startsWith('#')) val = '#' + val;
+
+        // Check if vaild hex color
+        if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
+            // normalise to 6 char hex
+            if (val.length === 4) {
+                val = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+            }
+            picker.value = val;
+            textInput.value = val;
+            applyStyle(property, val);
+        }
+    };
+
+    textInput.addEventListener('change', handleTextChange);
+    textInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') handleTextChange();
+    });
+}
+
+// Attach sync logic to the 4 color inputs
+syncColorInput(bgColorPicker, bgColorText, 'bg');
+syncColorInput(overlayColorPicker, overlayColorText, 'overlayColor');
+syncColorInput(textColorPicker, textColorText, 'text');
+syncColorInput(accentColorPicker, accentColorText, 'accent');
+
 bgImageUpload.addEventListener('change', handleBgImageUpload);
 removeBgImageBtn.addEventListener('click', () => {
     applyStyle('bgImage', 'none');
@@ -114,10 +157,7 @@ bgPosYSlider.addEventListener('input', () => applyStyle('bgPosY', bgPosYSlider.v
 fgScaleSlider.addEventListener('input', () => applyStyle('fgScale', fgScaleSlider.value));
 fgPosXSlider.addEventListener('input', () => applyStyle('fgPosX', fgPosXSlider.value));
 fgPosYSlider.addEventListener('input', () => applyStyle('fgPosY', fgPosYSlider.value));
-overlayColorPicker.addEventListener('input', () => applyStyle('overlayColor', overlayColorPicker.value));
 overlayOpacitySlider.addEventListener('input', () => applyStyle('overlayOpacity', overlayOpacitySlider.value));
-textColorPicker.addEventListener('input', () => applyStyle('text', textColorPicker.value));
-accentColorPicker.addEventListener('input', () => applyStyle('accent', accentColorPicker.value));
 
 fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilySelect.value));
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
@@ -551,8 +591,10 @@ function updateControlsToMatchCategory() {
     const styles = categoryStyles[target];
 
     // 1. Sync the UI controls if we have stored styles for this target
+    // 1. Sync the UI controls if we have stored styles for this target
     if (styles) {
         bgColorPicker.value = styles.bg;
+        bgColorText.value = styles.bg;
         if (!styles.bgImage || styles.bgImage === 'none') {
             bgImageUpload.value = '';
         }
@@ -563,9 +605,12 @@ function updateControlsToMatchCategory() {
         fgPosXSlider.value = styles.fgPosX !== undefined ? styles.fgPosX : "50";
         fgPosYSlider.value = styles.fgPosY !== undefined ? styles.fgPosY : "50";
         overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
+        overlayColorText.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
         overlayOpacitySlider.value = styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0";
         textColorPicker.value = styles.text;
+        textColorText.value = styles.text;
         accentColorPicker.value = styles.accent;
+        accentColorText.value = styles.accent;
 
         // Sync Typography Controls
         fontFamilySelect.value = styles.font;
