@@ -720,9 +720,15 @@ function applyStyle(property, value) {
     const cards = document.querySelectorAll('.game-card');
     cards.forEach(card => {
         let shouldApply = false;
-        if (target === 'all') shouldApply = true;
-        else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldApply = true;
-        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldApply = true;
+
+        if (target === 'all') {
+            // New Requirement: Backside cards are excluded from 'all' global styling
+            shouldApply = !card.classList.contains('is-backside');
+        } else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) {
+            shouldApply = true;
+        } else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) {
+            shouldApply = true;
+        }
 
         if (shouldApply) {
             updateCSSCustomProperty(card, property, value);
@@ -737,7 +743,10 @@ function applyStyle(property, value) {
     // Sub-propagation: If 'all' is modified, push it down to categories and cards so logic doesn't break
     if (target === 'all') {
         Object.keys(categoryStyles).forEach(key => {
-            if (key !== 'all') categoryStyles[key][property] = value;
+            // Skip updating backsides from 'all' (either cat_Back_X or card_Back_Y)
+            if (key !== 'all' && !key.includes('_Back_')) {
+                categoryStyles[key][property] = value;
+            }
         });
     } else if (target.startsWith('cat_')) {
         // If a Category is styled, push that style into any Single Card data structures belonging to that category
@@ -888,7 +897,7 @@ function handleAddCustomText() {
     // Sub-propagation
     if (target === 'all') {
         Object.keys(categoryStyles).forEach(key => {
-            if (key !== 'all') {
+            if (key !== 'all' && !key.includes('_Back_')) {
                 if (!categoryStyles[key].customTexts) categoryStyles[key].customTexts = [];
                 categoryStyles[key].customTexts.push({ ...newText });
             }
@@ -946,16 +955,7 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
 
         const newX = parseFloat(wrapper.style.left);
         const newY = parseFloat(wrapper.style.top);
-
-        const target = targetCategory.value;
-        const styles = categoryStyles[target];
-        if (styles && styles.customTexts) {
-            const txt = styles.customTexts.find(t => t.id === txtId);
-            if (txt) {
-                txt.x = newX;
-                txt.y = newY;
-            }
-        }
+        updateCustomTextDataStore(txtId, { x: newX, y: newY });
     });
 
     wrapper.addEventListener('dblclick', (e) => {
@@ -989,13 +989,7 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
                 removeCustomText(txtId);
             } else {
                 syncCustomTextContentUI(txtId, newText);
-
-                const target = targetCategory.value;
-                const styles = categoryStyles[target];
-                if (styles && styles.customTexts) {
-                    const txt = styles.customTexts.find(t => t.id === txtId);
-                    if (txt) txt.text = newText;
-                }
+                updateCustomTextDataStore(txtId, { text: newText });
             }
         }, 100);
     });
@@ -1011,16 +1005,46 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
     });
 }
 
+function updateCustomTextDataStore(id, updates) {
+    const target = targetCategory.value;
+
+    const applyMerge = (stylesObj) => {
+        if (stylesObj && stylesObj.customTexts) {
+            const txt = stylesObj.customTexts.find(t => t.id === id);
+            if (txt) Object.assign(txt, updates);
+        }
+    };
+
+    applyMerge(categoryStyles[target]);
+
+    if (target === 'all') {
+        Object.keys(categoryStyles).forEach(key => {
+            if (key !== 'all' && !key.includes('_Back_')) applyMerge(categoryStyles[key]);
+        });
+    } else if (target.startsWith('cat_')) {
+        const catName = target.substring(4);
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            if (card.dataset.category === catName) {
+                applyMerge(categoryStyles["card_" + card.dataset.title]);
+            }
+        });
+    }
+}
+
 function removeCustomText(id) {
     const target = targetCategory.value;
 
     // Sub-propagation removal
     if (target === 'all') {
         Object.keys(categoryStyles).forEach(key => {
-            if (categoryStyles[key].customTexts) {
+            if (categoryStyles[key].customTexts && key !== 'all' && !key.includes('_Back_')) {
                 categoryStyles[key].customTexts = categoryStyles[key].customTexts.filter(t => t.id !== id);
             }
         });
+        if (categoryStyles['all'].customTexts) {
+            categoryStyles['all'].customTexts = categoryStyles['all'].customTexts.filter(t => t.id !== id);
+        }
     } else if (target.startsWith('cat_')) {
         const catName = target.substring(4);
         const cards = document.querySelectorAll('.game-card');
