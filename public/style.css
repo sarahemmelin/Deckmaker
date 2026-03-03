@@ -593,6 +593,11 @@ button:disabled {
     /* hide the 'Click to add illustration' text */
     text-indent: -9999px;
     opacity: 1;
+    cursor: grab;
+}
+
+.card-image-placeholder.has-image:active {
+    cursor: grabbing;
 }
 
 .card-body {

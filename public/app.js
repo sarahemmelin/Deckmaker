@@ -293,9 +293,109 @@ function generateCards() {
                 ${rowData.Card_ID ? `<div class="card-id-footer">${escapeHTML(rowData.Card_ID)}</div>` : ''}
             `;
 
-            // Attach click listener for Image Upload
+            // Attach click/drag/scroll listener for Image
             const imgPlaceholder = cardEl.querySelector('.card-image-placeholder');
+
+            let isImgDragging = false;
+            let startX, startY;
+            let startPosX, startPosY;
+            let hasDragged = false;
+
+            imgPlaceholder.addEventListener('mousedown', (e) => {
+                if (!imgPlaceholder.classList.contains('has-image')) return;
+                isImgDragging = true;
+                hasDragged = false;
+                startX = e.clientX;
+                startY = e.clientY;
+
+                // Read current values
+                const currentX = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-x')) || 50;
+                const currentY = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-y')) || 50;
+                startPosX = currentX;
+                startPosY = currentY;
+
+                e.preventDefault(); // Prevent text selection
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isImgDragging) return;
+
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) hasDragged = true;
+
+                // Sensitivity multiplier (adjustable)
+                const sensitivity = 0.2;
+                let newX = startPosX - (deltaX * sensitivity);
+                let newY = startPosY - (deltaY * sensitivity);
+
+                // Clamping
+                newX = Math.max(0, Math.min(100, newX));
+                newY = Math.max(0, Math.min(100, newY));
+
+                cardEl.style.setProperty('--dynamic-card-fg-pos-x', `${newX}%`);
+                cardEl.style.setProperty('--dynamic-card-fg-pos-y', `${newY}%`);
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (!isImgDragging) return;
+                isImgDragging = false;
+
+                if (hasDragged) {
+                    // Save to state
+                    const newX = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-x'));
+                    const newY = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-y'));
+
+                    const tCategory = targetCategory.value;
+                    let shouldSave = false;
+
+                    if (tCategory === 'all') shouldSave = true;
+                    else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
+                    else if (tCategory.startsWith('card_') && cardEl.dataset.title === tCategory.substring(5)) shouldSave = true;
+
+                    if (shouldSave && categoryStyles[tCategory]) {
+                        categoryStyles[tCategory].fgPosX = newX;
+                        categoryStyles[tCategory].fgPosY = newY;
+                        fgPosXSlider.value = newX;
+                        fgPosYSlider.value = newY;
+                    }
+                }
+            });
+
+            // Zoom via Mouse Wheel
+            imgPlaceholder.addEventListener('wheel', (e) => {
+                if (!imgPlaceholder.classList.contains('has-image')) return;
+                e.preventDefault();
+
+                const currentScale = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-size')) || 100;
+
+                // Zoom direction
+                const zoomAmount = 5;
+                let newScale = currentScale;
+                if (e.deltaY > 0) newScale -= zoomAmount; // Scroll down = zoom out
+                else if (e.deltaY < 0) newScale += zoomAmount; // Scroll up = zoom in
+
+                newScale = Math.max(10, Math.min(300, newScale));
+
+                cardEl.style.setProperty('--dynamic-card-fg-size', `${newScale}%`);
+
+                // Save to state
+                const tCategory = targetCategory.value;
+                let shouldSave = false;
+
+                if (tCategory === 'all') shouldSave = true;
+                else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
+                else if (tCategory.startsWith('card_') && cardEl.dataset.title === tCategory.substring(5)) shouldSave = true;
+
+                if (shouldSave && categoryStyles[tCategory]) {
+                    categoryStyles[tCategory].fgScale = newScale;
+                    fgScaleSlider.value = newScale;
+                }
+            });
+
             imgPlaceholder.addEventListener('click', () => {
+                if (hasDragged) return; // Prevent upload dialog if we just finished dragging
                 activeImagePlaceholder = imgPlaceholder;
                 imageUploadInput.click();
             });
