@@ -846,15 +846,27 @@ function applyStoredStyles(cardDiv, category, title) {
 
     const texts = styles.customTexts || [];
     texts.forEach(txt => {
-        const span = document.createElement('div');
-        span.className = 'custom-text-element';
-        span.dataset.id = txt.id;
-        span.innerText = txt.text;
-        span.style.left = txt.x + '%';
-        span.style.top = txt.y + '%';
-        cardDiv.appendChild(span);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-text-element';
+        wrapper.dataset.id = txt.id;
+        wrapper.style.left = txt.x + '%';
+        wrapper.style.top = txt.y + '%';
 
-        attachCustomTextEvents(span, cardDiv, txt.id);
+        const contentSpan = document.createElement('span');
+        contentSpan.className = 'custom-text-content';
+        contentSpan.innerText = txt.text;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'text-delete-btn material-icons';
+        deleteBtn.innerHTML = 'delete';
+        // Prevent mousedown from propagating to the editable span so we don't blur immediately
+        deleteBtn.onmousedown = (e) => e.preventDefault();
+
+        wrapper.appendChild(contentSpan);
+        wrapper.appendChild(deleteBtn);
+        cardDiv.appendChild(wrapper);
+
+        attachCustomTextEvents(wrapper, cardDiv, txt.id, contentSpan, deleteBtn);
     });
 }
 
@@ -903,11 +915,11 @@ function handleAddCustomText() {
     });
 }
 
-function attachCustomTextEvents(span, cardDiv, txtId) {
+function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn) {
     let isDragging = false;
 
-    span.addEventListener('mousedown', (e) => {
-        if (span.classList.contains('is-editing')) return;
+    wrapper.addEventListener('mousedown', (e) => {
+        if (wrapper.classList.contains('is-editing')) return;
         isDragging = true;
         e.stopPropagation();
     });
@@ -922,8 +934,8 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
         newX = Math.max(0, Math.min(100, newX));
         newY = Math.max(0, Math.min(100, newY));
 
-        span.style.left = newX + '%';
-        span.style.top = newY + '%';
+        wrapper.style.left = newX + '%';
+        wrapper.style.top = newY + '%';
 
         syncCustomTextPosUI(txtId, newX, newY);
     });
@@ -932,8 +944,8 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
         if (!isDragging) return;
         isDragging = false;
 
-        const newX = parseFloat(span.style.left);
-        const newY = parseFloat(span.style.top);
+        const newX = parseFloat(wrapper.style.left);
+        const newY = parseFloat(wrapper.style.top);
 
         const target = targetCategory.value;
         const styles = categoryStyles[target];
@@ -946,45 +958,55 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
         }
     });
 
-    span.addEventListener('dblclick', (e) => {
-        span.contentEditable = true;
-        span.classList.add('is-editing');
-        span.focus();
-        // Select all text when double clicked
+    wrapper.addEventListener('dblclick', (e) => {
+        contentSpan.contentEditable = true;
+        wrapper.classList.add('is-editing');
+        contentSpan.focus();
+
         const range = document.createRange();
-        range.selectNodeContents(span);
+        range.selectNodeContents(contentSpan);
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
         e.stopPropagation();
     });
 
-    span.addEventListener('blur', () => {
-        span.contentEditable = false;
-        span.classList.remove('is-editing');
-        const newText = span.textContent.trim();
-
-        if (newText === '') {
-            removeCustomText(txtId);
-        } else {
-            syncCustomTextContentUI(txtId, newText);
-
-            const target = targetCategory.value;
-            const styles = categoryStyles[target];
-            if (styles && styles.customTexts) {
-                const txt = styles.customTexts.find(t => t.id === txtId);
-                if (txt) txt.text = newText;
-            }
-        }
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeCustomText(txtId);
     });
 
-    span.addEventListener('keydown', (e) => {
+    contentSpan.addEventListener('blur', () => {
+        // slight timeout in case they clicked the delete button
+        setTimeout(() => {
+            if (!document.body.contains(wrapper)) return; // Already deleted
+
+            contentSpan.contentEditable = false;
+            wrapper.classList.remove('is-editing');
+            const newText = contentSpan.textContent.trim();
+
+            if (newText === '') {
+                removeCustomText(txtId);
+            } else {
+                syncCustomTextContentUI(txtId, newText);
+
+                const target = targetCategory.value;
+                const styles = categoryStyles[target];
+                if (styles && styles.customTexts) {
+                    const txt = styles.customTexts.find(t => t.id === txtId);
+                    if (txt) txt.text = newText;
+                }
+            }
+        }, 100);
+    });
+
+    contentSpan.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            span.blur();
+            contentSpan.blur();
         } else if (e.key === 'Escape') {
             e.preventDefault();
-            span.blur();
+            contentSpan.blur();
         }
     });
 }
@@ -1057,9 +1079,12 @@ function syncCustomTextContentUI(id, newText) {
         else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
 
         if (shouldSync) {
-            const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
-            if (el && el !== document.activeElement) {
-                el.innerText = newText;
+            const wrapper = card.querySelector(`.custom-text-element[data-id="${id}"]`);
+            if (wrapper) {
+                const contentNode = wrapper.querySelector('.custom-text-content');
+                if (contentNode && contentNode !== document.activeElement) {
+                    contentNode.innerText = newText;
+                }
             }
         }
     });
