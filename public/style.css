@@ -329,6 +329,12 @@ button:disabled {
     border-color: #cbd5e1;
 }
 
+.btn-saved {
+    background-color: #10b981 !important;
+    color: white !important;
+    border-color: #10b981 !important;
+}
+
 /* =========================================
    WORKSPACE UI
    ========================================= */

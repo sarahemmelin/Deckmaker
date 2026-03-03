@@ -359,6 +359,7 @@ function generateCards() {
                         categoryStyles[tCategory].fgPosY = newY;
                         fgPosXSlider.value = newX;
                         fgPosYSlider.value = newY;
+                        resetPresetButtons();
                     }
                 }
             });
@@ -391,6 +392,7 @@ function generateCards() {
                 if (shouldSave && categoryStyles[tCategory]) {
                     categoryStyles[tCategory].fgScale = newScale;
                     fgScaleSlider.value = newScale;
+                    resetPresetButtons();
                 }
             });
 
@@ -636,6 +638,8 @@ function applyStyle(property, value) {
             }
         });
     }
+
+    resetPresetButtons();
 }
 
 function hexToRgba(hex, opacity) {
@@ -1056,6 +1060,23 @@ function populatePresetDropdown() {
     });
 }
 
+function setPresetSavedState(type) {
+    if (type === 'save') {
+        savePresetBtn.textContent = "Saved!";
+        savePresetBtn.classList.add('btn-saved');
+    } else if (type === 'update') {
+        updatePresetBtn.textContent = "Saved!";
+        updatePresetBtn.classList.add('btn-saved');
+    }
+}
+
+function resetPresetButtons() {
+    savePresetBtn.textContent = "Save New...";
+    savePresetBtn.classList.remove('btn-saved');
+    updatePresetBtn.textContent = "Save";
+    updatePresetBtn.classList.remove('btn-saved');
+}
+
 function handleSavePreset() {
     const name = prompt("Enter a name for this preset:");
     if (!name || name.trim() === '') return;
@@ -1071,19 +1092,18 @@ function handleSavePreset() {
     updatePresetBtn.disabled = false;
     deletePresetBtn.disabled = false;
 
-    alert(`Preset "${name.trim()}" saved locally!`);
+    setPresetSavedState('save');
 }
 
 function handleUpdatePreset() {
     const selected = presetSelect.value;
     if (!selected) return;
 
-    if (confirm(`Update preset "${selected}" with current styles?`)) {
-        const presets = getLocalPresets();
-        presets[selected] = JSON.parse(JSON.stringify(categoryStyles));
-        saveLocalPresets(presets);
-        alert(`Preset "${selected}" updated successfully!`);
-    }
+    const presets = getLocalPresets();
+    presets[selected] = JSON.parse(JSON.stringify(categoryStyles));
+    saveLocalPresets(presets);
+
+    setPresetSavedState('update');
 }
 
 function handleDeletePreset() {
