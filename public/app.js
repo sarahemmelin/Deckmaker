@@ -727,7 +727,50 @@ function attachCustomTextEvents(span, cardDiv, txtId) {
         if (e.key === 'Enter') {
             e.preventDefault();
             span.blur();
+        } else if ((e.key === 'Backspace' || e.key === 'Delete') && span.innerText === '') {
+            // Prevent default to avoid navigating back in some browsers if it's empty
+            e.preventDefault();
+            removeCustomText(txtId);
         }
+    });
+}
+
+function removeCustomText(id) {
+    const target = targetCategory.value;
+
+    // Sub-propagation removal
+    if (target === 'all') {
+        Object.keys(categoryStyles).forEach(key => {
+            if (categoryStyles[key].customTexts) {
+                categoryStyles[key].customTexts = categoryStyles[key].customTexts.filter(t => t.id !== id);
+            }
+        });
+    } else if (target.startsWith('cat_')) {
+        const catName = target.substring(4);
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            if (card.dataset.category === catName) {
+                const cardKey = "card_" + card.dataset.title;
+                if (categoryStyles[cardKey] && categoryStyles[cardKey].customTexts) {
+                    categoryStyles[cardKey].customTexts = categoryStyles[cardKey].customTexts.filter(t => t.id !== id);
+                }
+            }
+        });
+        // Also remove from the category itself
+        if (categoryStyles[target] && categoryStyles[target].customTexts) {
+            categoryStyles[target].customTexts = categoryStyles[target].customTexts.filter(t => t.id !== id);
+        }
+    } else {
+        // Just the single card
+        if (categoryStyles[target] && categoryStyles[target].customTexts) {
+            categoryStyles[target].customTexts = categoryStyles[target].customTexts.filter(t => t.id !== id);
+        }
+    }
+
+    // Re-render all cards
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        applyStoredStyles(card, card.dataset.category, card.dataset.title);
     });
 }
 
