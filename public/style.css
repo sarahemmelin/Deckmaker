@@ -938,7 +938,6 @@ button:disabled {
    ========================================= */
 @media print {
     @page {
-        size: A4 portrait;
         margin: 0;
         /* Setting margin to 0 removes default browser headers/footers (dates, URLs) */
     }

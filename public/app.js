@@ -113,6 +113,20 @@ presetSelect.addEventListener('change', () => {
 targetCategory.addEventListener('change', () => {
     updateControlsToMatchCategory();
     highlightSelectedCard();
+
+    // Sync Backside Mapping Target if it exists
+    const selectedTarget = targetCategory.value;
+    if (selectedTarget !== 'all') {
+        const mappingOptionExists = Array.from(mappingTargetSelect.options).some(opt => opt.value === selectedTarget);
+        if (mappingOptionExists) {
+            mappingTargetSelect.value = selectedTarget;
+            // Dispatch change event to trigger the backside select enablement/population
+            mappingTargetSelect.dispatchEvent(new Event('change'));
+        }
+    } else {
+        mappingTargetSelect.value = '';
+        mappingTargetSelect.dispatchEvent(new Event('change'));
+    }
     // Sync back button
     if (targetCategory.value !== 'all') {
         backToAllBtn.style.display = 'inline-flex';
@@ -247,6 +261,7 @@ mappingBacksideSelect.addEventListener('change', () => {
     const target = mappingTargetSelect.value;
     if (target) {
         backsideMappings[target] = mappingBacksideSelect.value;
+        resetPresetButtons();
     }
 });
 
@@ -736,10 +751,17 @@ function updateCategoryDropdown() {
     const cardGroup = document.createElement('optgroup');
     cardGroup.label = "Single Individual Cards";
     cardTitles.forEach(title => {
-        const isBackside = Array.from(cardCategories).some(cat => cat.startsWith('Back_') && document.querySelector(`.game-card[data-title="${title}"]`)?.dataset.category === cat);
-        // Only deep clone inherited "all" texts if it is a frontside card
+        const cardEl = document.querySelector(`.game-card[data-title="${CSS.escape(title)}"]`);
+        const catName = cardEl ? cardEl.dataset.category : null;
+        const isBackside = catName ? catName.startsWith('Back_') : false;
+
+        // Only deep clone inherited texts if it is a frontside card.
+        // Critically, we MUST inherit from the specific Category (if styled) so we don't accidentally overwrite category layouts with global defaults!
         if (!categoryStyles["card_" + title] && !isBackside) {
-            categoryStyles["card_" + title] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+            const sourceStyles = (catName && categoryStyles["cat_" + catName])
+                ? categoryStyles["cat_" + catName]
+                : categoryStyles["all"];
+            categoryStyles["card_" + title] = JSON.parse(JSON.stringify(sourceStyles));
         } else if (!categoryStyles["card_" + title] && isBackside) {
             // Blank slate for backsides since they exclude 'all' inherited texts
             categoryStyles["card_" + title] = { customTexts: [] };
@@ -963,7 +985,40 @@ function applyStoredStyles(cardDiv, category, title) {
     const isBackside = category.startsWith('Back_');
     const baseGlobal = categoryStyles["all"] || {};
     const baseCat = categoryStyles["cat_" + category] || {};
-    const baseCard = categoryStyles["card_" + title] || {};
+    let baseCard = categoryStyles["card_" + title];
+
+    // INFERENCE LOGIC: If this card has NO specific styling yet, infer its template from a sibling!
+    if (!baseCard && !isBackside && parsedCsvData) {
+        const siblings = parsedCsvData.filter(r => {
+            const t = r.Card_Type ? r.Card_Type.trim() : 'Uncategorized';
+            return t === category;
+        });
+
+        for (let sibling of siblings) {
+            const fallback = sibling.Card_ID ? sibling.Card_ID.trim() : 'Untitled';
+            const sibTitle = sibling.Card_Title ? sibling.Card_Title.trim() : fallback;
+
+            if (sibTitle !== title && categoryStyles["card_" + sibTitle]) {
+                // Clone the heavily-styled sibling so the new card inherits its exact layout
+                baseCard = JSON.parse(JSON.stringify(categoryStyles["card_" + sibTitle]));
+
+                // Clear the illustration so the user knows they need to upload a new one, but keep background/layout
+                if (baseCard.fgImage) baseCard.fgImage = 'none';
+
+                // Generate fresh IDs for custom texts so dragging them doesn't move them on the sibling card!
+                if (baseCard.customTexts) {
+                    baseCard.customTexts.forEach(txt => {
+                        txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                    });
+                }
+
+                categoryStyles["card_" + title] = baseCard; // Persist it
+                break;
+            }
+        }
+    }
+
+    baseCard = baseCard || {};
 
     let styles;
     if (isBackside) {
@@ -1535,7 +1590,10 @@ function handleSavePreset() {
     if (!name || name.trim() === '') return;
 
     const presets = getLocalPresets();
-    presets[name.trim()] = JSON.parse(JSON.stringify(categoryStyles));
+    presets[name.trim()] = {
+        styles: JSON.parse(JSON.stringify(categoryStyles)),
+        mappings: JSON.parse(JSON.stringify(backsideMappings))
+    };
     saveLocalPresets(presets);
 
     populatePresetDropdown();
@@ -1553,7 +1611,10 @@ function handleUpdatePreset() {
     if (!selected) return;
 
     const presets = getLocalPresets();
-    presets[selected] = JSON.parse(JSON.stringify(categoryStyles));
+    presets[selected] = {
+        styles: JSON.parse(JSON.stringify(categoryStyles)),
+        mappings: JSON.parse(JSON.stringify(backsideMappings))
+    };
     saveLocalPresets(presets);
 
     setPresetSavedState('update');
@@ -1592,7 +1653,15 @@ function handleLoadPreset() {
 }
 
 function loadPresetData(data) {
-    categoryStyles = JSON.parse(JSON.stringify(data));
+    if (data.styles) {
+        // New save format
+        categoryStyles = JSON.parse(JSON.stringify(data.styles));
+        backsideMappings = data.mappings ? JSON.parse(JSON.stringify(data.mappings)) : {};
+    } else {
+        // Legacy save format (backwards compatibility)
+        categoryStyles = JSON.parse(JSON.stringify(data));
+        backsideMappings = {};
+    }
 
     // Re-apply all styles
     const cards = document.querySelectorAll('.game-card');
@@ -1640,11 +1709,14 @@ async function handleExportPreset() {
     exportPresetBtn.textContent = "Exporting...";
 
     try {
-        const exportData = JSON.parse(JSON.stringify(categoryStyles));
+        const exportData = {
+            styles: JSON.parse(JSON.stringify(categoryStyles)),
+            mappings: JSON.parse(JSON.stringify(backsideMappings))
+        };
 
         // Find all bgImage and fgImage values and convert to base64 if they are local uploads
-        for (const targetKey in exportData) {
-            const style = exportData[targetKey];
+        for (const targetKey in exportData.styles) {
+            const style = exportData.styles[targetKey];
             if (style.bgImage && style.bgImage.includes('/uploads/')) {
                 const urlMatch = style.bgImage.match(/url\(['"]?([^'"]+)['"]?\)/);
                 if (urlMatch && urlMatch[1]) {
@@ -1694,8 +1766,11 @@ async function handleImportPreset(event) {
             const uploadPromises = [];
             const urlMapping = {}; // Map old URLs to new URLs
 
-            for (const targetKey in importedData) {
-                const style = importedData[targetKey];
+            // Determine if new format or old format
+            const stylesToProcess = importedData.styles ? importedData.styles : importedData;
+
+            for (const targetKey in stylesToProcess) {
+                const style = stylesToProcess[targetKey];
 
                 if (style.bgImageBase64) {
                     const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
@@ -1746,8 +1821,8 @@ async function handleImportPreset(event) {
             }
 
             // Update the imported data with the newly generated URLs
-            for (const targetKey in importedData) {
-                const style = importedData[targetKey];
+            for (const targetKey in stylesToProcess) {
+                const style = stylesToProcess[targetKey];
 
                 if (style.bgImageBase64) {
                     const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
@@ -1772,7 +1847,10 @@ async function handleImportPreset(event) {
                 const name = prompt("Enter a name for this preset:");
                 if (name && name.trim() !== '') {
                     const presets = getLocalPresets();
-                    presets[name.trim()] = JSON.parse(JSON.stringify(importedData));
+                    presets[name.trim()] = {
+                        styles: JSON.parse(JSON.stringify(stylesToProcess)),
+                        mappings: importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {}
+                    };
                     saveLocalPresets(presets);
                     populatePresetDropdown();
                     presetSelect.value = name.trim();
@@ -1854,7 +1932,7 @@ function generatePrintLayout() {
     layout.innerHTML = '';
 
     // 1. Gather all currently visible front cards from the grid in order
-    const visibleCards = Array.from(document.querySelectorAll('#cardGrid .game-card')).filter(c => {
+    const visibleCards = Array.from(document.querySelectorAll('#cardGrid .game-card:not(.is-backside)')).filter(c => {
         if (c.parentElement && c.parentElement.classList.contains('card-wrapper')) {
             return c.parentElement.style.display !== 'none';
         }
