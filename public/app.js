@@ -27,6 +27,7 @@ const bgColorPicker = document.getElementById('bgColorPicker');
 const bgColorText = document.getElementById('bgColorText');
 const bgImageUpload = document.getElementById('bgImageUpload');
 const removeBgImageBtn = document.getElementById('removeBgImageBtn');
+const clearOverlayBtn = document.getElementById('clearOverlayBtn');
 const bgScaleSlider = document.getElementById('bgScaleSlider');
 const bgPosXSlider = document.getElementById('bgPosXSlider');
 const bgPosYSlider = document.getElementById('bgPosYSlider');
@@ -112,10 +113,19 @@ presetSelect.addEventListener('change', () => {
 targetCategory.addEventListener('change', () => {
     updateControlsToMatchCategory();
     highlightSelectedCard();
-    if (targetCategory.value === 'all') {
-        backToAllBtn.style.display = 'none';
+    // Sync back button
+    if (targetCategory.value !== 'all') {
+        backToAllBtn.style.display = 'inline-flex';
     } else {
-        backToAllBtn.style.display = 'flex';
+        backToAllBtn.style.display = 'none';
+
+        // Restore scroll position
+        if (savedScrollPos > 0) {
+            // Need a slight timeout to let DOM render the grid before scrolling
+            setTimeout(() => {
+                window.scrollTo({ top: savedScrollPos, behavior: 'smooth' });
+            }, 50);
+        }
     }
 });
 
@@ -160,11 +170,12 @@ function syncColorInput(picker, textInput, property) {
     });
 }
 
-// Attach sync logic to the 4 color inputs
+// Attach sync logic to the 5 color inputs
 syncColorInput(bgColorPicker, bgColorText, 'bg');
 syncColorInput(overlayColorPicker, overlayColorText, 'overlayColor');
 syncColorInput(textColorPicker, textColorText, 'text');
 syncColorInput(accentColorPicker, accentColorText, 'accent');
+syncColorInput(document.getElementById('redFilterColorPicker'), document.getElementById('redFilterColorText'), 'redFilter');
 
 bgImageUpload.addEventListener('change', handleBgImageUpload);
 removeBgImageBtn.addEventListener('click', () => {
@@ -201,6 +212,18 @@ bindSlider(fgPosXSlider, 'fgPosX');
 bindSlider(fgPosYSlider, 'fgPosY');
 bindSlider(overlayOpacitySlider, 'overlayOpacity');
 bindSlider(fontSizeSlider, 'size');
+
+clearOverlayBtn.addEventListener('click', () => {
+    // Reset the internal model representations by applying the default values
+    applyStyle('overlayColor', '#ffffff');
+    applyStyle('overlayOpacity', '0');
+
+    // Visually reset the active sidebar controls
+    overlayColorPicker.value = '#ffffff';
+    overlayColorText.value = '#ffffff';
+    overlayOpacitySlider.value = 0;
+    updateSliderBackground(overlayOpacitySlider);
+});
 
 fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilySelect.value));
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
@@ -346,6 +369,9 @@ function generateCards() {
             // from the CSS toggle it dynamically from the Styling Panel so sizing doesn't break.
             if (rowData.Buoy_Mod) badgesHTML += `<span class="stat-badge buoy-badge">Buoyancy: ${escapeHTML(rowData.Buoy_Mod)}</span>`;
 
+            // Add Duplicate Button explicitly
+            const duplicateBtnHTML = `<button class="duplicate-card-btn material-icons" title="Duplicate this Card" data-index="${parsedCsvData.indexOf(rowData)}">content_copy</button>`;
+
             // Build Points HTML (Body)
             let pointsHTML = '';
             if (rowData.Min_Pts || rowData.Bio_Pts) {
@@ -358,6 +384,7 @@ function generateCards() {
             cardEl.innerHTML = `
                 <div class="card-bg-layer"></div>
                 <div class="card-overlay-layer"></div>
+                ${duplicateBtnHTML}
                 <div class="card-type-banner"></div>
                 <div class="card-header">
                     <h3 class="card-title">${escapeHTML(title)}</h3>
@@ -524,6 +551,53 @@ function generateCards() {
 
             // Click-to-Select Card logic
             cardEl.addEventListener('click', (e) => {
+                // Handle Duplicate Card Click
+                if (e.target.classList.contains('duplicate-card-btn')) {
+                    const rowIdx = parseInt(e.target.dataset.index, 10);
+                    if (!isNaN(rowIdx)) {
+                        const originalRow = parsedCsvData[rowIdx];
+                        const clonedRow = { ...originalRow }; // Shallow copy
+
+                        // Modify the Title
+                        let baseTitle = clonedRow.Card_Title || clonedRow.Card_ID || 'Untitled';
+                        let copyNum = 2; // Default starting copy number
+
+                        // Check if it already has a trailing "_#" or " (Copy #)" and increment it safely
+                        const match = baseTitle.match(/_(\d+)$/);
+                        if (match) {
+                            baseTitle = baseTitle.substring(0, match.index);
+                            copyNum = parseInt(match[1], 10) + 1;
+                        }
+
+                        // Ensure we don't collide with existing names by accident
+                        let newTitle = `${baseTitle}_${copyNum}`;
+                        while (parsedCsvData.some(r => r.Card_Title === newTitle || r.Card_ID === newTitle)) {
+                            copyNum++;
+                            newTitle = `${baseTitle}_${copyNum}`;
+                        }
+
+                        clonedRow.Card_Title = newTitle;
+                        // Avoid ID collisions if Card_ID exists
+                        if (clonedRow.Card_ID) clonedRow.Card_ID = `${clonedRow.Card_ID}_${copyNum}`;
+
+                        // Push to dataset
+                        parsedCsvData.push(clonedRow);
+
+                        // Optional: Copy preset styles from the original
+                        const originalKey = `card_${title}`;
+                        const newKey = `card_${newTitle}`;
+                        if (categoryStyles[originalKey]) {
+                            // Deep copy styles via JSON stringify to avoid reference tangles
+                            categoryStyles[newKey] = JSON.parse(JSON.stringify(categoryStyles[originalKey]));
+                        }
+
+                        // Re-render
+                        // Wait a tiny fraction so the click event finishes propagating before we destroy the DOM
+                        setTimeout(() => generateCards(), 10);
+                        return;
+                    }
+                }
+
                 // Ignore clicks on images or custom texts so we don't interrupt uploads/drags
                 if (e.target.closest('.card-image-placeholder') || e.target.closest('.custom-text-element')) return;
 
@@ -620,9 +694,16 @@ async function handleImageSelection(event) {
 /**
  * --- Bulk Styling & Targeting Logic ---
  */
+let savedScrollPos = 0;
+
 function selectCardTarget(title) {
     const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
     if (exactCardOpt) {
+        // Record scroll position before jumping into card view
+        if (targetCategory.value === 'all') {
+            savedScrollPos = window.scrollY || document.documentElement.scrollTop;
+        }
+
         // Only trigger DOM update if it's an actual change, to prevent jitter
         if (targetCategory.value !== exactCardOpt.value) {
             targetCategory.value = exactCardOpt.value;
@@ -860,6 +941,7 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     }
 
     if (propName === 'text') cardDiv.style.setProperty('--dynamic-card-text', value);
+    if (propName === 'redFilter') cardDiv.style.setProperty('--dynamic-card-red-text', value);
     if (propName === 'accent') cardDiv.style.setProperty('--dynamic-card-accent', value);
     if (propName === 'font') cardDiv.style.setProperty('--dynamic-card-font', value);
     if (propName === 'size') {
@@ -905,6 +987,7 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'overlayColor', styles.overlayColor !== undefined ? styles.overlayColor : '#ffffff');
     updateCSSCustomProperty(cardDiv, 'overlayOpacity', styles.overlayOpacity !== undefined ? styles.overlayOpacity : '0');
     updateCSSCustomProperty(cardDiv, 'text', styles.text !== undefined ? styles.text : '#111827');
+    updateCSSCustomProperty(cardDiv, 'redFilter', styles.redFilter !== undefined ? styles.redFilter : '#ef4444');
     updateCSSCustomProperty(cardDiv, 'accent', styles.accent !== undefined ? styles.accent : '#1f2937');
     updateCSSCustomProperty(cardDiv, 'font', styles.font !== undefined ? styles.font : "'Inter', sans-serif");
     updateCSSCustomProperty(cardDiv, 'size', styles.size !== undefined ? styles.size : '1');
@@ -927,10 +1010,27 @@ function applyStoredStyles(cardDiv, category, title) {
         if (txt.size) wrapper.style.fontSize = txt.size + 'rem';
         if (txt.color) wrapper.style.color = txt.color;
         if (txt.bg) wrapper.style.backgroundColor = txt.bg;
+        if (txt.bold) wrapper.style.fontWeight = 'bold';
+        else wrapper.style.fontWeight = '600';
 
         const contentSpan = document.createElement('span');
         contentSpan.className = 'custom-text-content';
         contentSpan.innerText = txt.text;
+
+        if (txt.width) contentSpan.style.width = txt.width;
+        if (txt.height) contentSpan.style.height = txt.height;
+
+        const ro = new ResizeObserver(() => {
+            if (activeCtxId === txt.id && wrapper.classList.contains('is-editing')) {
+                const newW = contentSpan.style.width;
+                const newH = contentSpan.style.height;
+                if (newW && newH) {
+                    updateCustomTextDataStore(txt.id, { width: newW, height: newH });
+                    syncCustomTextSizeUI(txt.id, newW, newH);
+                }
+            }
+        });
+        ro.observe(contentSpan);
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'text-delete-btn material-icons';
@@ -995,7 +1095,17 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
     let isDragging = false;
 
     wrapper.addEventListener('mousedown', (e) => {
-        if (wrapper.classList.contains('is-editing')) return;
+        // Show properties on single click without entering typing mode
+        if (activeCtxId !== txtId) {
+            showCtxToolbar(wrapper, txtId);
+        }
+
+        // If we click the wrapper while editing, let it pass so it can blur or focus naturally
+        if (wrapper.classList.contains('is-editing')) {
+            e.stopPropagation();
+            return;
+        }
+
         isDragging = true;
         e.stopPropagation();
     });
@@ -1126,6 +1236,28 @@ function removeCustomText(id) {
     });
 }
 
+function syncCustomTextSizeUI(id, newW, newH) {
+    const target = targetCategory.value;
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => {
+        let shouldSync = false;
+        if (target === 'all') shouldSync = true;
+        else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+
+        if (shouldSync) {
+            const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
+            if (el) {
+                const span = el.querySelector('.custom-text-content');
+                if (span && span !== document.activeElement) {
+                    span.style.width = newW;
+                    span.style.height = newH;
+                }
+            }
+        }
+    });
+}
+
 function syncCustomTextPosUI(id, newX, newY) {
     const target = targetCategory.value;
     const cards = document.querySelectorAll('.game-card');
@@ -1151,6 +1283,7 @@ function syncCustomTextPosUI(id, newX, newY) {
 const customTextToolbar = document.getElementById('customTextToolbar');
 const ctxFontSelect = document.getElementById('ctxFontSelect');
 const ctxSizeInput = document.getElementById('ctxSizeInput');
+const ctxBoldToggle = document.getElementById('ctxBoldToggle');
 const ctxColorPicker = document.getElementById('ctxColorPicker');
 const ctxBgPicker = document.getElementById('ctxBgPicker');
 const ctxClearBgBtn = document.getElementById('ctxClearBgBtn');
@@ -1199,15 +1332,15 @@ function showCtxToolbar(wrapper, id) {
     if (txtData) {
         ctxFontSelect.value = txtData.font || 'inherit';
         ctxSizeInput.value = txtData.size || 1;
+        ctxBoldToggle.checked = !!txtData.bold;
         ctxColorPicker.value = txtData.color || '#111827';
         // HTML Color inputs only support 6-character hex
         ctxBgPicker.value = (txtData.bg && txtData.bg !== 'transparent') ? txtData.bg : '#ffffff';
     }
 
-    const rect = wrapper.getBoundingClientRect();
     customTextToolbar.style.display = 'flex';
-    customTextToolbar.style.left = (rect.left + rect.width / 2) + 'px';
-    customTextToolbar.style.top = (rect.top - 10) + 'px';
+    customTextToolbar.style.flexDirection = 'column';
+    customTextToolbar.parentElement.parentElement.open = true; // ensure accordion is open
 }
 
 ctxFontSelect.addEventListener('change', () => {
@@ -1219,6 +1352,11 @@ ctxSizeInput.addEventListener('input', () => {
     if (!activeCtxId) return;
     updateCustomTextDataStore(activeCtxId, { size: ctxSizeInput.value });
     activeCtxWrapper.style.fontSize = ctxSizeInput.value + 'rem';
+});
+ctxBoldToggle.addEventListener('change', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { bold: ctxBoldToggle.checked });
+    activeCtxWrapper.style.fontWeight = ctxBoldToggle.checked ? 'bold' : '600';
 });
 ctxColorPicker.addEventListener('input', () => {
     if (!activeCtxId) return;

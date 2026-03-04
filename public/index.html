@@ -106,11 +106,6 @@
                         <option value="all">All Cards</option>
                         <!-- Options generated dynamically based on Card_Type -->
                     </select>
-                    <button id="backToAllBtn" class="secondary-btn"
-                        style="display: none; padding: 0.25rem 0.5rem; font-size: 0.8rem; width: 100%;">
-                        <span class="material-icons btn-icon" style="font-size: 1rem;">arrow_back</span>
-                        Back to All Cards
-                    </button>
                 </div>
 
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
@@ -177,8 +172,15 @@
                         <div class="style-field"
                             style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
                             <label for="overlayOpacitySlider">Overlay Opacity:</label>
-                            <input type="range" id="overlayOpacitySlider" min="0" max="1" step="0.05" value="0"
-                                style="width: 100%;">
+                            <div style="display: flex; width: 100%; gap: 0.5rem; align-items: center;">
+                                <input type="range" id="overlayOpacitySlider" min="0" max="1" step="0.05" value="0"
+                                    style="flex: 1;">
+                                <button id="clearOverlayBtn"
+                                    style="padding: 0.25rem; width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #ef4444; color: white;"
+                                    title="Remove Background Overlay">
+                                    <span class="material-icons" style="font-size: 1rem;">format_color_reset</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </details>
@@ -288,6 +290,18 @@
                         </div>
 
                         <div class="style-field">
+                            <label for="redFilterColorPicker">Red Filter Color:</label>
+                            <div class="lightning-color-picker">
+                                <label class="color-swatch-wrapper">
+                                    <input type="color" id="redFilterColorPicker" value="#ef4444">
+                                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                </label>
+                                <input type="text" id="redFilterColorText" class="color-text-input" value="#ef4444"
+                                    autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="style-field">
                             <label for="wordBreakToggle">Force Word Break:</label>
                             <input type="checkbox" id="wordBreakToggle">
                         </div>
@@ -310,6 +324,63 @@
                         <p
                             style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; text-align: center;">
                             Double-click to edit, drag to move. Delete all text to remove.</p>
+
+                        <!-- Toolbar for Active Custom Text -->
+                        <div id="customTextToolbar" class="ctx-sidebar-editor">
+                            <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+                            <h4
+                                style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 0.5rem; text-align: center;">
+                                Text Properties (Click a text element to edit)</h4>
+                            <div class="style-field">
+                                <label for="ctxFontSelect">Font:</label>
+                                <select id="ctxFontSelect" class="style-select">
+                                    <option value="inherit">Card Default</option>
+                                    <option value="'Inter', sans-serif">Inter</option>
+                                    <option value="'Roboto', sans-serif">Roboto</option>
+                                    <option value="'Montserrat', sans-serif">Montserrat</option>
+                                    <option value="'Oswald', sans-serif">Oswald</option>
+                                    <option value="'Playfair Display', serif">Playfair Display</option>
+                                    <option value="'Georgia', serif">Georgia</option>
+                                    <option value="'Courier New', monospace">Courier</option>
+                                    <option value="'Impact', sans-serif">Impact</option>
+                                </select>
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxSizeInput">Size Mult:</label>
+                                <input type="number" id="ctxSizeInput" step="0.1" min="0.5" max="5.0"
+                                    style="width: 120px; padding: 0.25rem;" title="Multiplier (e.g. 1.2)">
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxBoldToggle">Bold Text:</label>
+                                <input type="checkbox" id="ctxBoldToggle">
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxColorPicker">Text Color:</label>
+                                <div class="lightning-color-picker" style="width: 120px;">
+                                    <label class="color-swatch-wrapper" style="width: 100%;">
+                                        <input type="color" id="ctxColorPicker" style="width: 100%;">
+                                        <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxBgPicker">Backdrop:</label>
+                                <div style="display: flex; gap: 0.25rem; width: 120px;">
+                                    <div class="lightning-color-picker" style="flex: 1;">
+                                        <label class="color-swatch-wrapper" style="width: 100%;">
+                                            <input type="color" id="ctxBgPicker" style="width: 100%;">
+                                            <span class="material-icons dropdown-icon"
+                                                style="position: absolute; right: 2px;">arrow_drop_down</span>
+                                        </label>
+                                    </div>
+                                    <button id="ctxClearBgBtn"
+                                        style="padding: 0.25rem; width: 28px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #ef4444; color: white;"
+                                        title="Clear Backdrop">
+                                        <span class="material-icons" style="font-size: 1rem;">format_color_reset</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </details>
             </div>
@@ -327,7 +398,14 @@
         <!-- Main Workspace: Card Grid -->
         <main class="workspace">
             <div class="workspace-header no-print">
-                <h2>Card Preview</h2>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button id="backToAllBtn" class="secondary-btn"
+                        style="display: none; padding: 0.25rem 0.75rem; font-size: 0.8rem;">
+                        <span class="material-icons btn-icon" style="font-size: 1.1rem;">arrow_back</span>
+                        Back to All Cards
+                    </button>
+                    <h2>Card Preview</h2>
+                </div>
                 <span id="cardCount" class="badge">0 Cards</span>
             </div>
 
@@ -347,51 +425,6 @@
 
     <!-- Hidden input for interactive image uploads -->
     <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
-
-    <!-- Floating Toolbar for Custom Texts -->
-    <div id="customTextToolbar" class="floating-toolbar" style="display: none;">
-        <div class="toolbar-group">
-            <label for="ctxFontSelect">Font</label>
-            <select id="ctxFontSelect" class="style-select">
-                <option value="inherit">Card Default</option>
-                <option value="'Inter', sans-serif">Inter</option>
-                <option value="'Roboto', sans-serif">Roboto</option>
-                <option value="'Montserrat', sans-serif">Montserrat</option>
-                <option value="'Oswald', sans-serif">Oswald</option>
-                <option value="'Playfair Display', serif">Playfair Display</option>
-                <option value="'Georgia', serif">Georgia</option>
-                <option value="'Courier New', monospace">Courier</option>
-                <option value="'Impact', sans-serif">Impact</option>
-            </select>
-        </div>
-        <div class="toolbar-group">
-            <label for="ctxSizeInput">Size</label>
-            <input type="number" id="ctxSizeInput" step="0.1" min="0.5" max="5.0" title="Multiplier (e.g. 1.2)">
-        </div>
-        <div class="toolbar-group">
-            <label for="ctxColorPicker">Text</label>
-            <div class="lightning-color-picker mini-picker">
-                <label class="color-swatch-wrapper">
-                    <input type="color" id="ctxColorPicker">
-                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
-                </label>
-            </div>
-        </div>
-        <div class="toolbar-group">
-            <label for="ctxBgPicker">Backdrop</label>
-            <div class="lightning-color-picker mini-picker">
-                <label class="color-swatch-wrapper">
-                    <input type="color" id="ctxBgPicker">
-                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
-                </label>
-            </div>
-        </div>
-        <div class="toolbar-group">
-            <button id="ctxClearBgBtn" class="toolbar-btn" title="Clear Backdrop">
-                <span class="material-icons">format_color_reset</span>
-            </button>
-        </div>
-    </div>
 
     <!-- Application Logic -->
     <script src="app.js"></script>

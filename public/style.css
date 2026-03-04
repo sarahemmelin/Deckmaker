@@ -95,6 +95,21 @@ body {
     flex-direction: column;
 }
 
+.workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.workspace-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
 .sidebar-header h1 {
     font-size: 1.5rem;
     font-weight: 800;
@@ -455,6 +470,36 @@ button:disabled {
     font-weight: 600;
 }
 
+.duplicate-card-btn {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: white;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 20;
+}
+
+.game-card:hover .duplicate-card-btn {
+    opacity: 1;
+}
+
+.duplicate-card-btn:hover {
+    background-color: var(--primary-hover);
+    transform: scale(1.1);
+}
+
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -495,7 +540,6 @@ button:disabled {
     width: 2.5in;
     height: 3.5in;
     background-color: var(--dynamic-card-bg);
-    border: 1px solid var(--border-color);
     border-radius: 0.375rem;
     box-shadow: var(--shadow-lg);
     position: relative;
@@ -512,7 +556,6 @@ button:disabled {
 
 .game-card.is-selected {
     box-shadow: 0 0 0 4px var(--primary-color);
-    border-color: var(--primary-color);
 }
 
 /* Backside Card Simplify */
@@ -628,11 +671,27 @@ button:disabled {
 }
 
 .custom-text-element.is-editing {
-    cursor: text;
-    user-select: text;
     border-color: var(--accent-color);
     background-color: rgba(255, 255, 255, 0.8);
+    z-index: 50;
+}
+
+.custom-text-content {
+    display: block;
+    resize: both;
+    overflow: hidden;
+    min-width: 20px;
+    min-height: 1.5em;
+    width: 100%;
+    height: 100%;
+}
+
+.custom-text-element.is-editing .custom-text-content {
+    cursor: text;
+    user-select: text;
     outline: none;
+    -webkit-user-select: text;
+    pointer-events: auto;
 }
 
 .text-delete-btn {
@@ -744,6 +803,8 @@ button:disabled {
     padding-bottom: 0.05in;
     margin-bottom: 0.05in;
     margin-top: 0.05in;
+    min-height: 0.35in;
+    /* Standardize baseline for 1-line vs 2-line wrapped titles */
 }
 
 .card-title {
@@ -842,7 +903,7 @@ button:disabled {
 }
 
 .card-red-text {
-    color: var(--danger-text);
+    color: var(--dynamic-card-red-text, #ef4444);
     font-weight: 700;
 }
 
