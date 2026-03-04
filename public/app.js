@@ -95,6 +95,75 @@ csvFileInput.addEventListener('change', handleFileUpload);
 generateBtn.addEventListener('click', generateCards);
 printBtn.addEventListener('click', generatePrintLayout);
 
+// Undo/Redo & Copy/Paste System
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 50;
+let copiedStyles = null;
+
+function saveStateToHistory() {
+    undoStack.push(JSON.stringify(categoryStyles));
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = []; // Clear future redos when branching history
+}
+
+function handleUndo() {
+    if (undoStack.length === 0) return;
+    redoStack.push(JSON.stringify(categoryStyles));
+    categoryStyles = JSON.parse(undoStack.pop());
+    reapplyAllStyles();
+}
+
+function handleRedo() {
+    if (redoStack.length === 0) return;
+    undoStack.push(JSON.stringify(categoryStyles));
+    categoryStyles = JSON.parse(redoStack.pop());
+    reapplyAllStyles();
+}
+
+function reapplyAllStyles() {
+    const cards = document.querySelectorAll('.game-card');
+    cards.forEach(card => applyStoredStyles(card, card.dataset.category, card.dataset.sysId));
+    updateControlsToMatchCategory();
+}
+
+document.addEventListener('keydown', (e) => {
+    // Ignore keystrokes if typing inside text fields
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        const target = targetCategory.value;
+        if (target !== 'all' && categoryStyles[target]) {
+            e.preventDefault();
+            copiedStyles = JSON.parse(JSON.stringify(categoryStyles[target]));
+        }
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+        const target = targetCategory.value;
+        if (target !== 'all' && copiedStyles) {
+            e.preventDefault();
+            saveStateToHistory();
+            const newStyles = JSON.parse(JSON.stringify(copiedStyles));
+            // Regenerate IDs
+            if (newStyles.customTexts) {
+                newStyles.customTexts.forEach(txt => {
+                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                });
+            }
+            categoryStyles[target] = Object.assign({}, categoryStyles[target], newStyles);
+            reapplyAllStyles();
+        }
+    }
+});
+
 // Preset Listeners
 savePresetBtn.addEventListener('click', handleSavePreset);
 loadPresetBtn.addEventListener('click', handleLoadPreset);
@@ -154,6 +223,9 @@ backToAllBtn.addEventListener('click', () => {
 
 // Color Picker Helpers
 function syncColorInput(picker, textInput, property) {
+    picker.addEventListener('mousedown', saveStateToHistory);
+    textInput.addEventListener('focus', saveStateToHistory);
+
     // When swatch changes, update text and apply globally
     picker.addEventListener('input', () => {
         textInput.value = picker.value;
@@ -193,6 +265,7 @@ syncColorInput(document.getElementById('redFilterColorPicker'), document.getElem
 
 bgImageUpload.addEventListener('change', handleBgImageUpload);
 removeBgImageBtn.addEventListener('click', () => {
+    saveStateToHistory();
     applyStyle('bgImage', 'none');
     bgImageUpload.value = '';
 });
@@ -209,6 +282,8 @@ function updateSliderBackground(slider) {
 function bindSlider(slider, propertyName) {
     // Initial paint
     updateSliderBackground(slider);
+
+    slider.addEventListener('mousedown', saveStateToHistory);
 
     slider.addEventListener('input', () => {
         applyStyle(propertyName, slider.value);
@@ -228,6 +303,7 @@ bindSlider(overlayOpacitySlider, 'overlayOpacity');
 bindSlider(fontSizeSlider, 'size');
 
 clearOverlayBtn.addEventListener('click', () => {
+    saveStateToHistory();
     // Reset the internal model representations by applying the default values
     applyStyle('overlayColor', '#ffffff');
     applyStyle('overlayOpacity', '0');
@@ -239,10 +315,10 @@ clearOverlayBtn.addEventListener('click', () => {
     updateSliderBackground(overlayOpacitySlider);
 });
 
-fontFamilySelect.addEventListener('change', () => applyStyle('font', fontFamilySelect.value));
+fontFamilySelect.addEventListener('change', () => { saveStateToHistory(); applyStyle('font', fontFamilySelect.value); });
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
-wordBreakToggle.addEventListener('change', () => applyStyle('wordBreak', wordBreakToggle.checked));
-showBuoyancyToggle.addEventListener('change', () => applyStyle('showBuoy', showBuoyancyToggle.checked));
+wordBreakToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('wordBreak', wordBreakToggle.checked); });
+showBuoyancyToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('showBuoy', showBuoyancyToggle.checked); });
 addCustomTextBtn.addEventListener('click', handleAddCustomText);
 
 // Backside Mapping Listeners
@@ -355,6 +431,7 @@ function generateCards() {
     cardCategories.clear();
     cardTitles.clear();
     let totalCardsGenerated = 0;
+    const titleCounts = {};
 
     parsedCsvData.forEach(rowData => {
         // Track unique Card_Types for the Styling dropdown
@@ -363,20 +440,27 @@ function generateCards() {
         const fallback = rowData.Card_ID ? rowData.Card_ID.trim() : 'Untitled';
         const title = rowData.Card_Title ? rowData.Card_Title.trim() : fallback;
         if (type) cardCategories.add(type);
-        cardTitles.add(title);
 
         // Handle Quantity. Default is 1 if not specified or invalid.
         let qty = parseInt(rowData.Qty, 10);
         if (isNaN(qty) || qty < 1) qty = 1;
 
         for (let q = 0; q < qty; q++) {
+            // Uniquely identify each copy visually and systemically
+            if (!titleCounts[title]) titleCounts[title] = 0;
+            titleCounts[title]++;
+            const copyNum = titleCounts[title];
+            const sysId = copyNum > 1 ? `${title}__copy${copyNum}` : title;
+            cardTitles.add(sysId);
+
             const cardEl = document.createElement('div');
             cardEl.className = 'game-card';
             if (type.startsWith('Back_')) {
                 cardEl.classList.add('is-backside');
             }
             cardEl.dataset.category = type; // Critical for targeted styling
-            cardEl.dataset.title = title;
+            cardEl.dataset.title = title; // Visual title only
+            cardEl.dataset.sysId = sysId; // Anchor for css updates
 
             // Build Top Badges
             let badgesHTML = '';
@@ -428,13 +512,14 @@ function generateCards() {
 
             imgPlaceholder.addEventListener('mousedown', (e) => {
                 if (!imgPlaceholder.classList.contains('has-image')) return;
+                saveStateToHistory();
                 isImgDragging = true;
                 hasDragged = false;
                 startX = e.clientX;
                 startY = e.clientY;
 
                 // Auto-select this card so image manipulations are strictly localized
-                selectCardTarget(title);
+                selectCardTarget(sysId);
 
                 // Read current values
                 const currentX = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-x')) || 50;
@@ -480,7 +565,7 @@ function generateCards() {
 
                     if (tCategory === 'all') shouldSave = true;
                     else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
-                    else if (tCategory.startsWith('card_') && cardEl.dataset.title === tCategory.substring(5)) shouldSave = true;
+                    else if (tCategory.startsWith('card_') && cardEl.dataset.sysId === tCategory.substring(5)) shouldSave = true;
 
                     if (shouldSave && categoryStyles[tCategory]) {
                         categoryStyles[tCategory].fgPosX = newX;
@@ -495,12 +580,17 @@ function generateCards() {
             });
 
             // Zoom via Mouse Wheel
+            let zoomTimeout;
             imgPlaceholder.addEventListener('wheel', (e) => {
                 if (!imgPlaceholder.classList.contains('has-image')) return;
                 e.preventDefault();
 
+                if (!zoomTimeout) saveStateToHistory();
+                clearTimeout(zoomTimeout);
+                zoomTimeout = setTimeout(() => { zoomTimeout = null; }, 500);
+
                 // Auto-select this card so image manipulations are strictly localized
-                selectCardTarget(title);
+                selectCardTarget(sysId);
 
                 const currentScale = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-size')) || 100;
 
@@ -520,7 +610,7 @@ function generateCards() {
 
                 if (tCategory === 'all') shouldSave = true;
                 else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
-                else if (tCategory.startsWith('card_') && cardEl.dataset.title === tCategory.substring(5)) shouldSave = true;
+                else if (tCategory.startsWith('card_') && cardEl.dataset.sysId === tCategory.substring(5)) shouldSave = true;
 
                 if (shouldSave && categoryStyles[tCategory]) {
                     categoryStyles[tCategory].fgScale = newScale;
@@ -537,7 +627,7 @@ function generateCards() {
             });
 
             // Apply existing styles immediately on generation
-            applyStoredStyles(cardEl, type, title);
+            applyStoredStyles(cardEl, type, sysId);
 
             if (type.startsWith('Back_')) {
                 const wrapper = document.createElement('div');
@@ -554,7 +644,7 @@ function generateCards() {
 
                 // Allow clicking the backside label to select it since the card itself is often filled with draggable images
                 label.addEventListener('click', (e) => {
-                    selectCardTarget(title);
+                    selectCardTarget(sysId);
                 });
 
                 wrapper.appendChild(label);
@@ -571,39 +661,29 @@ function generateCards() {
                     const rowIdx = parseInt(e.target.dataset.index, 10);
                     if (!isNaN(rowIdx)) {
                         const originalRow = parsedCsvData[rowIdx];
-                        const clonedRow = { ...originalRow }; // Shallow copy
+                        const clonedRow = { ...originalRow, Qty: "1" }; // Shallow copy, force Qty to 1 to prevent exploding counts
 
-                        // Modify the Title
-                        let baseTitle = clonedRow.Card_Title || clonedRow.Card_ID || 'Untitled';
-                        let copyNum = 2; // Default starting copy number
-
-                        // Check if it already has a trailing "_#" or " (Copy #)" and increment it safely
-                        const match = baseTitle.match(/_(\d+)$/);
-                        if (match) {
-                            baseTitle = baseTitle.substring(0, match.index);
-                            copyNum = parseInt(match[1], 10) + 1;
-                        }
-
-                        // Ensure we don't collide with existing names by accident
-                        let newTitle = `${baseTitle}_${copyNum}`;
-                        while (parsedCsvData.some(r => r.Card_Title === newTitle || r.Card_ID === newTitle)) {
-                            copyNum++;
-                            newTitle = `${baseTitle}_${copyNum}`;
-                        }
-
-                        clonedRow.Card_Title = newTitle;
-                        // Avoid ID collisions if Card_ID exists
-                        if (clonedRow.Card_ID) clonedRow.Card_ID = `${clonedRow.Card_ID}_${copyNum}`;
-
-                        // Push to dataset
+                        // Push to dataset (Title rewriting removed!)
                         parsedCsvData.push(clonedRow);
 
                         // Optional: Copy preset styles from the original
-                        const originalKey = `card_${title}`;
-                        const newKey = `card_${newTitle}`;
+                        const originalKey = `card_${sysId}`;
+
+                        // Predict the new sysId (It will be the current title's total count + 1)
+                        const newCopyNum = titleCounts[title] + 1;
+                        const newSysId = `${title}__copy${newCopyNum}`;
+                        const newKey = `card_${newSysId}`;
+
                         if (categoryStyles[originalKey]) {
                             // Deep copy styles via JSON stringify to avoid reference tangles
                             categoryStyles[newKey] = JSON.parse(JSON.stringify(categoryStyles[originalKey]));
+
+                            // Regenerate IDs for custom texts so they aren't linked across siblings!
+                            if (categoryStyles[newKey].customTexts) {
+                                categoryStyles[newKey].customTexts.forEach(txt => {
+                                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                                });
+                            }
                         }
 
                         // Re-render
@@ -617,7 +697,7 @@ function generateCards() {
                 if (e.target.closest('.card-image-placeholder') || e.target.closest('.custom-text-element')) return;
 
                 // Select this exact card in the dropdown
-                selectCardTarget(title);
+                selectCardTarget(sysId);
             });
 
             totalCardsGenerated++;
@@ -687,7 +767,7 @@ async function handleImageSelection(event) {
             // Save state to correct category/card
             const cardEl = activeImagePlaceholder.closest('.game-card');
             if (cardEl) {
-                const targetTitle = cardEl.dataset.title;
+                const targetTitle = cardEl.dataset.sysId;
                 const targetKey = "card_" + targetTitle;
 
                 if (!categoryStyles[targetKey]) {
@@ -750,26 +830,35 @@ function updateCategoryDropdown() {
     // Group 2: Single Cards
     const cardGroup = document.createElement('optgroup');
     cardGroup.label = "Single Individual Cards";
-    cardTitles.forEach(title => {
-        const cardEl = document.querySelector(`.game-card[data-title="${CSS.escape(title)}"]`);
+    cardTitles.forEach(sysId => {
+        const cardEl = document.querySelector(`.game-card[data-sys-id="${CSS.escape(sysId)}"]`);
         const catName = cardEl ? cardEl.dataset.category : null;
+        const baseTitle = cardEl ? cardEl.dataset.title : sysId;
         const isBackside = catName ? catName.startsWith('Back_') : false;
 
         // Only deep clone inherited texts if it is a frontside card.
         // Critically, we MUST inherit from the specific Category (if styled) so we don't accidentally overwrite category layouts with global defaults!
-        if (!categoryStyles["card_" + title] && !isBackside) {
+        if (!categoryStyles["card_" + sysId] && !isBackside) {
             const sourceStyles = (catName && categoryStyles["cat_" + catName])
                 ? categoryStyles["cat_" + catName]
                 : categoryStyles["all"];
-            categoryStyles["card_" + title] = JSON.parse(JSON.stringify(sourceStyles));
-        } else if (!categoryStyles["card_" + title] && isBackside) {
+            categoryStyles["card_" + sysId] = JSON.parse(JSON.stringify(sourceStyles));
+        } else if (!categoryStyles["card_" + sysId] && isBackside) {
             // Blank slate for backsides since they exclude 'all' inherited texts
-            categoryStyles["card_" + title] = { customTexts: [] };
+            categoryStyles["card_" + sysId] = { customTexts: [] };
         }
 
         const opt = document.createElement('option');
-        opt.value = "card_" + title;
-        opt.textContent = `Card: ${title}`;
+        opt.value = "card_" + sysId;
+
+        // Parse sysId for a clean display name
+        const match = sysId.match(/__copy(\d+)$/);
+        if (match) {
+            opt.textContent = `Card: ${baseTitle} (Copy ${match[1]})`;
+        } else {
+            opt.textContent = `Card: ${baseTitle}`;
+        }
+
         cardGroup.appendChild(opt);
     });
     targetCategory.appendChild(cardGroup);
@@ -786,7 +875,7 @@ function highlightSelectedCard() {
         card.classList.remove('is-selected');
 
         // Add if specifically targeted
-        if (target === `card_${card.dataset.title}`) {
+        if (target === `card_${card.dataset.sysId}`) {
             card.classList.add('is-selected');
         }
     });
@@ -845,7 +934,7 @@ function updateControlsToMatchCategory() {
             shouldShow = true;
         } else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) {
             shouldShow = true;
-        } else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) {
+        } else if (target.startsWith('card_') && card.dataset.sysId === target.substring(5)) {
             shouldShow = true;
         }
 
@@ -878,7 +967,7 @@ function applyStyle(property, value) {
             shouldApply = !card.classList.contains('is-backside');
         } else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) {
             shouldApply = true;
-        } else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) {
+        } else if (target.startsWith('card_') && card.dataset.sysId === target.substring(5)) {
             shouldApply = true;
         }
 
@@ -905,7 +994,7 @@ function applyStyle(property, value) {
         const catName = target.substring(4);
         cards.forEach(card => {
             if (card.dataset.category === catName) {
-                const cardKey = "card_" + card.dataset.title;
+                const cardKey = "card_" + card.dataset.sysId;
                 if (categoryStyles[cardKey]) categoryStyles[cardKey][property] = value;
             }
         });
@@ -955,7 +1044,7 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     }
 
     if (propName === 'overlayColor' || propName === 'overlayOpacity') {
-        const styles = categoryStyles["card_" + cardDiv.dataset.title] || categoryStyles["cat_" + cardDiv.dataset.category] || categoryStyles["all"];
+        const styles = categoryStyles["card_" + cardDiv.dataset.sysId] || categoryStyles["cat_" + cardDiv.dataset.category] || categoryStyles["all"];
         const hex = propName === 'overlayColor' ? value : (styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff");
         const opacity = propName === 'overlayOpacity' ? value : (styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0");
         const rgba = hexToRgba(hex, opacity);
@@ -988,33 +1077,69 @@ function applyStoredStyles(cardDiv, category, title) {
     let baseCard = categoryStyles["card_" + title];
 
     // INFERENCE LOGIC: If this card has NO specific styling yet, infer its template from a sibling!
-    if (!baseCard && !isBackside && parsedCsvData) {
-        const siblings = parsedCsvData.filter(r => {
-            const t = r.Card_Type ? r.Card_Type.trim() : 'Uncategorized';
-            return t === category;
+    const sysId = title; // In the new system, 'title' arg passed to applyStoredStyles is actually the sysId
+
+    if (!baseCard && !isBackside && parsedCsvData && parsedCsvData.length > 0) {
+        // Since `applyStoredStyles` runs before all cards are appended to the DOM, we cannot use document.querySelector.
+        // Instead, we reconstruct the sysId iteration logic by scanning the CSV exactly as generateCards does.
+        const siblings = [];
+        const tempCounts = {};
+
+        parsedCsvData.forEach(row => {
+            const rType = row.Card_Type ? row.Card_Type.trim() : 'Uncategorized';
+            const rFallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
+            const rTitle = row.Card_Title ? row.Card_Title.trim() : rFallback;
+
+            let qty = parseInt(row.Qty, 10);
+            if (isNaN(qty) || qty < 1) qty = 1;
+
+            for (let q = 0; q < qty; q++) {
+                if (!tempCounts[rTitle]) tempCounts[rTitle] = 0;
+                tempCounts[rTitle]++;
+                const cNum = tempCounts[rTitle];
+                const generatedSysId = cNum > 1 ? `${rTitle}__copy${cNum}` : rTitle;
+
+                if (rType === category) {
+                    siblings.push(generatedSysId);
+                }
+            }
         });
 
-        for (let sibling of siblings) {
-            const fallback = sibling.Card_ID ? sibling.Card_ID.trim() : 'Untitled';
-            const sibTitle = sibling.Card_Title ? sibling.Card_Title.trim() : fallback;
+        // Search backwards to preferentially inherit from the most recently adjacent sibling
+        const reversedSiblings = [...siblings].reverse();
 
-            if (sibTitle !== title && categoryStyles["card_" + sibTitle]) {
-                // Clone the heavily-styled sibling so the new card inherits its exact layout
-                baseCard = JSON.parse(JSON.stringify(categoryStyles["card_" + sibTitle]));
+        let chosenSiblingStyle = null;
+        let fallbackSiblingStyle = null;
 
-                // Clear the illustration so the user knows they need to upload a new one, but keep background/layout
-                if (baseCard.fgImage) baseCard.fgImage = 'none';
+        for (let sibSysId of reversedSiblings) {
+            if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
+                const sStyle = categoryStyles["card_" + sibSysId];
 
-                // Generate fresh IDs for custom texts so dragging them doesn't move them on the sibling card!
-                if (baseCard.customTexts) {
-                    baseCard.customTexts.forEach(txt => {
-                        txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
-                    });
-                }
-
-                categoryStyles["card_" + title] = baseCard; // Persist it
+                // If a sibling has any dedicated card style stored, inherit from it!
+                // We don't need to aggressively check if it's different from the global base anymore,
+                // because merely having a `card_` key implies they clicked target and tweaked it.
+                chosenSiblingStyle = sStyle;
                 break;
             }
+        }
+
+        const styleToClone = chosenSiblingStyle || fallbackSiblingStyle;
+
+        if (styleToClone) {
+            // Clone the heavily-styled sibling so the new card inherits its exact layout
+            baseCard = JSON.parse(JSON.stringify(styleToClone));
+
+            // Clear the illustration so the user knows they need to upload a new one, but keep background/layout
+            if (baseCard.fgImage) baseCard.fgImage = 'none';
+
+            // Generate fresh IDs for custom texts so dragging them doesn't move them on the sibling card!
+            if (baseCard.customTexts) {
+                baseCard.customTexts.forEach(txt => {
+                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                });
+            }
+
+            categoryStyles["card_" + sysId] = baseCard; // Persist it
         }
     }
 
@@ -1109,6 +1234,7 @@ function escapeHTML(str) {
 }
 
 function handleAddCustomText() {
+    saveStateToHistory();
     const target = targetCategory.value;
     const newText = { id: 'ctx_' + Date.now(), text: 'New Text', x: 50, y: 50 };
 
@@ -1129,7 +1255,7 @@ function handleAddCustomText() {
         const cards = document.querySelectorAll('.game-card');
         cards.forEach(card => {
             if (card.dataset.category === catName) {
-                const cardKey = "card_" + card.dataset.title;
+                const cardKey = "card_" + card.dataset.sysId;
                 if (categoryStyles[cardKey]) {
                     if (!categoryStyles[cardKey].customTexts) categoryStyles[cardKey].customTexts = [];
                     if (!categoryStyles[cardKey].customTexts.find(t => t.id === newText.id)) {
@@ -1142,7 +1268,7 @@ function handleAddCustomText() {
 
     const cards = document.querySelectorAll('.game-card');
     cards.forEach(card => {
-        applyStoredStyles(card, card.dataset.category, card.dataset.title);
+        applyStoredStyles(card, card.dataset.category, card.dataset.sysId);
     });
 }
 
@@ -1150,6 +1276,7 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
     let isDragging = false;
 
     wrapper.addEventListener('mousedown', (e) => {
+        saveStateToHistory();
         // Show properties on single click without entering typing mode
         if (activeCtxId !== txtId) {
             showCtxToolbar(wrapper, txtId);
@@ -1243,13 +1370,14 @@ function updateCustomTextDataStore(id, updates) {
         const cards = document.querySelectorAll('.game-card');
         cards.forEach(card => {
             if (card.dataset.category === catName) {
-                applyMerge(categoryStyles["card_" + card.dataset.title]);
+                applyMerge(categoryStyles["card_" + card.dataset.sysId]);
             }
         });
     }
 }
 
 function removeCustomText(id) {
+    saveStateToHistory();
     const target = targetCategory.value;
 
     // Sub-propagation removal
@@ -1267,7 +1395,7 @@ function removeCustomText(id) {
         const cards = document.querySelectorAll('.game-card');
         cards.forEach(card => {
             if (card.dataset.category === catName) {
-                const cardKey = "card_" + card.dataset.title;
+                const cardKey = "card_" + card.dataset.sysId;
                 if (categoryStyles[cardKey] && categoryStyles[cardKey].customTexts) {
                     categoryStyles[cardKey].customTexts = categoryStyles[cardKey].customTexts.filter(t => t.id !== id);
                 }
@@ -1287,7 +1415,7 @@ function removeCustomText(id) {
     // Re-render all cards
     const cards = document.querySelectorAll('.game-card');
     cards.forEach(card => {
-        applyStoredStyles(card, card.dataset.category, card.dataset.title);
+        applyStoredStyles(card, card.dataset.category, card.dataset.sysId);
     });
 }
 
@@ -1298,7 +1426,7 @@ function syncCustomTextSizeUI(id, newW, newH) {
         let shouldSync = false;
         if (target === 'all') shouldSync = true;
         else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
-        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.sysId === target.substring(5)) shouldSync = true;
 
         if (shouldSync) {
             const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
@@ -1320,7 +1448,7 @@ function syncCustomTextPosUI(id, newX, newY) {
         let shouldSync = false;
         if (target === 'all') shouldSync = true;
         else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
-        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.sysId === target.substring(5)) shouldSync = true;
 
         if (shouldSync) {
             const el = card.querySelector(`.custom-text-element[data-id="${id}"]`);
@@ -1379,7 +1507,7 @@ function showCtxToolbar(wrapper, id) {
     const target = targetCategory.value;
     let txtData = null;
 
-    const searchTarget = categoryStyles["card_" + wrapper.closest('.game-card').dataset.title] || categoryStyles[target] || categoryStyles["all"];
+    const searchTarget = categoryStyles["card_" + wrapper.closest('.game-card').dataset.sysId] || categoryStyles[target] || categoryStyles["all"];
     if (searchTarget && searchTarget.customTexts) {
         txtData = searchTarget.customTexts.find(t => t.id === id);
     }
@@ -1397,6 +1525,14 @@ function showCtxToolbar(wrapper, id) {
     customTextToolbar.style.flexDirection = 'column';
     customTextToolbar.parentElement.parentElement.open = true; // ensure accordion is open
 }
+
+// Bind history saves to raw interactions with the toolbar
+ctxFontSelect.addEventListener('mousedown', saveStateToHistory);
+ctxSizeInput.addEventListener('mousedown', saveStateToHistory);
+ctxBoldToggle.addEventListener('mousedown', saveStateToHistory);
+ctxColorPicker.addEventListener('mousedown', saveStateToHistory);
+ctxBgPicker.addEventListener('mousedown', saveStateToHistory);
+ctxClearBgBtn.addEventListener('mousedown', saveStateToHistory);
 
 ctxFontSelect.addEventListener('change', () => {
     if (!activeCtxId) return;
@@ -1436,7 +1572,7 @@ function syncCustomTextContentUI(id, newText) {
         let shouldSync = false;
         if (target === 'all') shouldSync = true;
         else if (target.startsWith('cat_') && card.dataset.category === target.substring(4)) shouldSync = true;
-        else if (target.startsWith('card_') && card.dataset.title === target.substring(5)) shouldSync = true;
+        else if (target.startsWith('card_') && card.dataset.sysId === target.substring(5)) shouldSync = true;
 
         if (shouldSync) {
             const wrapper = card.querySelector(`.custom-text-element[data-id="${id}"]`);
@@ -1592,7 +1728,8 @@ function handleSavePreset() {
     const presets = getLocalPresets();
     presets[name.trim()] = {
         styles: JSON.parse(JSON.stringify(categoryStyles)),
-        mappings: JSON.parse(JSON.stringify(backsideMappings))
+        mappings: JSON.parse(JSON.stringify(backsideMappings)),
+        deck: JSON.parse(JSON.stringify(parsedCsvData))
     };
     saveLocalPresets(presets);
 
@@ -1613,7 +1750,8 @@ function handleUpdatePreset() {
     const presets = getLocalPresets();
     presets[selected] = {
         styles: JSON.parse(JSON.stringify(categoryStyles)),
-        mappings: JSON.parse(JSON.stringify(backsideMappings))
+        mappings: JSON.parse(JSON.stringify(backsideMappings)),
+        deck: JSON.parse(JSON.stringify(parsedCsvData))
     };
     saveLocalPresets(presets);
 
@@ -1653,24 +1791,34 @@ function handleLoadPreset() {
 }
 
 function loadPresetData(data) {
+    let shouldRegenerateDeck = false;
+
     if (data.styles) {
         // New save format
         categoryStyles = JSON.parse(JSON.stringify(data.styles));
         backsideMappings = data.mappings ? JSON.parse(JSON.stringify(data.mappings)) : {};
+        if (data.deck && data.deck.length > 0) {
+            parsedCsvData = JSON.parse(JSON.stringify(data.deck));
+            shouldRegenerateDeck = true;
+        }
     } else {
         // Legacy save format (backwards compatibility)
         categoryStyles = JSON.parse(JSON.stringify(data));
         backsideMappings = {};
     }
 
-    // Re-apply all styles
-    const cards = document.querySelectorAll('.game-card');
-    cards.forEach(card => {
-        applyStoredStyles(card, card.dataset.category, card.dataset.title);
-    });
-
-    // Sync UI with 'all' settings by default or current targeted item
-    updateControlsToMatchCategory();
+    if (shouldRegenerateDeck) {
+        // Re-generate the entire grid from the saved state, which automatically invokes applyStoredStyles
+        generateCards();
+        document.getElementById('generateBtn').disabled = false;
+    } else {
+        // Re-apply all styles gracefully without wiping grid
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach(card => {
+            applyStoredStyles(card, card.dataset.category, card.dataset.sysId);
+        });
+        updateControlsToMatchCategory();
+    }
 }
 
 // Convert image URL to Base64
@@ -1711,7 +1859,8 @@ async function handleExportPreset() {
     try {
         const exportData = {
             styles: JSON.parse(JSON.stringify(categoryStyles)),
-            mappings: JSON.parse(JSON.stringify(backsideMappings))
+            mappings: JSON.parse(JSON.stringify(backsideMappings)),
+            deck: JSON.parse(JSON.stringify(parsedCsvData))
         };
 
         // Find all bgImage and fgImage values and convert to base64 if they are local uploads
@@ -1879,15 +2028,8 @@ function updateBacksideMapping() {
     mappingBacksideSelect.disabled = true;
 
     const frontCategories = Array.from(cardCategories);
-    const allTitles = new Set();
 
-    parsedCsvData.forEach(row => {
-        const fallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
-        const title = row.Card_Title ? row.Card_Title.trim() : fallback;
-        allTitles.add(title);
-    });
-
-    if (frontCategories.length === 0 || allTitles.size === 0) {
+    if (frontCategories.length === 0 || cardTitles.size === 0) {
         mappingSection.style.display = 'none';
         mappingDivider.style.display = 'none';
         return;
@@ -1910,19 +2052,39 @@ function updateBacksideMapping() {
     // Populate Targets (Individual Cards)
     const cardGroup = document.createElement('optgroup');
     cardGroup.label = "Single Individual Cards";
-    allTitles.forEach(title => {
+    cardTitles.forEach(sysId => {
         const opt = document.createElement('option');
-        opt.value = "card_" + title;
-        opt.textContent = `Card: ${title}`;
+        opt.value = "card_" + sysId;
+
+        const cardEl = document.querySelector(`.game-card[data-sys-id="${CSS.escape(sysId)}"]`);
+        const baseTitle = cardEl ? cardEl.dataset.title : sysId;
+        const match = sysId.match(/__copy(\d+)$/);
+
+        if (match) {
+            opt.textContent = `Card: ${baseTitle} (Copy ${match[1]})`;
+        } else {
+            opt.textContent = `Card: ${baseTitle}`;
+        }
+
         cardGroup.appendChild(opt);
     });
     mappingTargetSelect.appendChild(cardGroup);
 
     // Populate Backsides
-    allTitles.forEach(bt => {
+    cardTitles.forEach(sysId => {
         const opt = document.createElement('option');
-        opt.value = bt;
-        opt.textContent = bt;
+        opt.value = sysId;
+
+        const cardEl = document.querySelector(`.game-card[data-sys-id="${CSS.escape(sysId)}"]`);
+        const baseTitle = cardEl ? cardEl.dataset.title : sysId;
+        const match = sysId.match(/__copy(\d+)$/);
+
+        if (match) {
+            opt.textContent = `${baseTitle} (Copy ${match[1]})`;
+        } else {
+            opt.textContent = baseTitle;
+        }
+
         mappingBacksideSelect.appendChild(opt);
     });
 }
@@ -1987,12 +2149,12 @@ function generatePrintLayout() {
 
             chunk.forEach((frontCard, index) => {
                 const cat = frontCard.dataset.category;
-                const title = frontCard.dataset.title;
-                const mappedBackTitle = backsideMappings["card_" + title] || backsideMappings["cat_" + cat];
+                const sysId = frontCard.dataset.sysId;
+                const mappedBackSysId = backsideMappings["card_" + sysId] || backsideMappings["cat_" + cat];
 
                 let backNodeToUse = null;
-                if (mappedBackTitle) {
-                    const existingBackCard = document.querySelector(`.game-card[data-title="${CSS.escape(mappedBackTitle)}"]`);
+                if (mappedBackSysId) {
+                    const existingBackCard = document.querySelector(`.game-card[data-sys-id="${CSS.escape(mappedBackSysId)}"]`);
                     if (existingBackCard) {
                         backNodeToUse = existingBackCard.cloneNode(true);
                         backNodeToUse.style.display = 'flex'; // Ensure it's not hidden

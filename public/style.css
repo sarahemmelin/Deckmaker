@@ -939,7 +939,8 @@ button:disabled {
 @media print {
     @page {
         margin: 0;
-        /* Setting margin to 0 removes default browser headers/footers (dates, URLs) */
+        margin: 0.5in;
+        /* Force hardware symmetry during duplex printing to prevent skew */
     }
 
     html,
@@ -950,7 +951,6 @@ button:disabled {
 
     body {
         background-color: white !important;
-        padding: 0.2in !important;
         /* Re-introduce a safe, consistent margin inside the page */
         margin: 0;
         -webkit-print-color-adjust: exact;
@@ -987,11 +987,11 @@ button:disabled {
         grid-auto-rows: var(--card-height) !important;
         gap: 0 !important;
         justify-content: center;
-        align-content: start;
+        align-content: center;
+        /* Center mathematically for perfect duplex symmetry */
+        height: 100vh !important;
         page-break-after: always;
         break-after: page;
-        /* Padding to prevent cutting off at top/bottom of real paper */
-        padding-top: 0.2in;
     }
 
     .print-page:last-child {
