@@ -31,6 +31,11 @@
                     <input type="file" id="csvFileInput" accept=".csv" class="file-input">
                 </label>
                 <div id="fileStatus" class="file-status">No file uploaded.</div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button id="generateBtn" class="primary-btn" style="flex: 2;" disabled>Generate Cards</button>
+                    <button id="addBlankCardBtn" class="secondary-btn" style="flex: 1; padding: 0.5rem;"
+                        title="Add an empty custom card to your deck">Add Blank</button>
+                </div>
             </div>
 
             <hr class="sidebar-divider" />
@@ -311,6 +316,106 @@
                 <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
 
                 <details class="style-accordion">
+                    <summary>Stat Typography & Icons</summary>
+                    <div class="accordion-content">
+                        <!-- Buoyancy Settings -->
+                        <div
+                            style="border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 0.25rem; margin-bottom: 0.5rem;">
+                            <h4
+                                style="margin: 0 0 0.5rem 0; font-size: 0.85em; font-weight: 700; color: var(--text-secondary);">
+                                Buoyancy Badge</h4>
+                            <div class="style-field">
+                                <label for="statBuoyVisible">Show Badge:</label>
+                                <input type="checkbox" id="statBuoyVisible" checked>
+                            </div>
+                            <div class="style-field">
+                                <label for="statBuoyIcon">Icon Name:</label>
+                                <input type="text" id="statBuoyIcon" list="materialIconsList"
+                                    style="width: 100%; padding: 0.25rem;" value="arrow_downward"
+                                    title="Material Icon name">
+                            </div>
+                            <div class="style-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                <label for="statBuoySize">Size Scale:</label>
+                                <input type="range" id="statBuoySize" min="0.5" max="3" step="0.1" value="1.1"
+                                    style="width: 100%;">
+                            </div>
+                            <div class="style-field">
+                                <label for="statBuoyColor">Color:</label>
+                                <div class="lightning-color-picker">
+                                    <label class="color-swatch-wrapper">
+                                        <input type="color" id="statBuoyColor" value="#ffffff">
+                                        <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mineral Pts Settings -->
+                        <div
+                            style="border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 0.25rem; margin-bottom: 0.5rem;">
+                            <h4
+                                style="margin: 0 0 0.5rem 0; font-size: 0.85em; font-weight: 700; color: var(--text-secondary);">
+                                Mineral Points</h4>
+                            <div class="style-field">
+                                <label for="statMinVisible">Show Stat:</label>
+                                <input type="checkbox" id="statMinVisible" checked>
+                            </div>
+                            <div class="style-field">
+                                <label for="statMinIcon">Icon Name:</label>
+                                <input type="text" id="statMinIcon" list="materialIconsList"
+                                    style="width: 100%; padding: 0.25rem;" value="diamond" title="Material Icon name">
+                            </div>
+                            <div class="style-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                <label for="statMinSize">Size Scale:</label>
+                                <input type="range" id="statMinSize" min="0.5" max="3" step="0.1" value="1.6"
+                                    style="width: 100%;">
+                            </div>
+                            <div class="style-field">
+                                <label for="statMinColor">Color:</label>
+                                <div class="lightning-color-picker">
+                                    <label class="color-swatch-wrapper">
+                                        <input type="color" id="statMinColor" value="#1f2937">
+                                        <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bio Pts Settings -->
+                        <div style="border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 0.25rem;">
+                            <h4
+                                style="margin: 0 0 0.5rem 0; font-size: 0.85em; font-weight: 700; color: var(--text-secondary);">
+                                Bio Points</h4>
+                            <div class="style-field">
+                                <label for="statBioVisible">Show Stat:</label>
+                                <input type="checkbox" id="statBioVisible" checked>
+                            </div>
+                            <div class="style-field">
+                                <label for="statBioIcon">Icon Name:</label>
+                                <input type="text" id="statBioIcon" list="materialIconsList"
+                                    style="width: 100%; padding: 0.25rem;" value="eco" title="Material Icon name">
+                            </div>
+                            <div class="style-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                <label for="statBioSize">Size Scale:</label>
+                                <input type="range" id="statBioSize" min="0.5" max="3" step="0.1" value="1.6"
+                                    style="width: 100%;">
+                            </div>
+                            <div class="style-field">
+                                <label for="statBioColor">Color:</label>
+                                <div class="lightning-color-picker">
+                                    <label class="color-swatch-wrapper">
+                                        <input type="color" id="statBioColor" value="#1f2937">
+                                        <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
+
+                <details class="style-accordion">
                     <summary>Custom Elements</summary>
                     <div class="accordion-content">
                         <div class="style-field">
@@ -427,6 +532,25 @@
     <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
 
     <!-- Application Logic -->
+
+    <!-- Datalist for explicit icon suggestions -->
+    <datalist id="materialIconsList">
+        <option value="arrow_downward">
+        <option value="diamond">
+        <option value="eco">
+        <option value="anchor">
+        <option value="star">
+        <option value="favorite">
+        <option value="science">
+        <option value="build">
+        <option value="rocket_launch">
+        <option value="water_drop">
+        <option value="bolt">
+        <option value="shield">
+        <option value="key">
+        <option value="paid">
+    </datalist>
+
     <script src="app.js"></script>
 </body>
 

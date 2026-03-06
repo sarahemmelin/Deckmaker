@@ -470,10 +470,17 @@ button:disabled {
     font-weight: 600;
 }
 
-.duplicate-card-btn {
+.card-action-btns {
     position: absolute;
     top: 0.25rem;
     right: 0.25rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 20;
+}
+
+.duplicate-card-btn,
+.delete-card-btn {
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -488,15 +495,26 @@ button:disabled {
     box-shadow: var(--shadow-md);
     opacity: 0;
     transition: all 0.2s ease;
-    z-index: 20;
 }
 
-.game-card:hover .duplicate-card-btn {
+.delete-card-btn {
+    background-color: #ef4444;
+    /* red color for delete */
+}
+
+.game-card:hover .duplicate-card-btn,
+.game-card:hover .delete-card-btn {
     opacity: 1;
 }
 
 .duplicate-card-btn:hover {
     background-color: var(--primary-hover);
+    transform: scale(1.1);
+}
+
+.delete-card-btn:hover {
+    background-color: #dc2626;
+    /* darker red on hover */
     transform: scale(1.1);
 }
 
@@ -799,7 +817,6 @@ button:disabled {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom: 2px solid var(--dynamic-card-accent);
     padding-bottom: 0.05in;
     margin-bottom: 0.05in;
     margin-top: 0.05in;
@@ -838,17 +855,32 @@ button:disabled {
 
 .buoy-badge {
     display: var(--dynamic-card-buoy-display);
-    width: 0.95in;
-    /* exactly equal fixed size for all cards */
+    min-width: 0.45in;
+    /* At least original size, but can stretch */
+    width: max-content;
+    padding: 0 4px;
     height: 0.22in;
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
+    color: var(--stat-buoy-color, #ffffff);
+    font-size: var(--stat-buoy-size, 1.1em);
 }
 
-.stat-badge.bio {
-    background: #10b981;
-    color: white;
+.card-points {
+    color: var(--dynamic-card-accent);
+}
+
+.card-points .stat-min {
+    color: var(--stat-min-color, inherit);
+    font-size: var(--stat-min-size, 1.6em);
+    display: var(--stat-min-display, flex);
+}
+
+.card-points .stat-bio {
+    color: var(--stat-bio-color, inherit);
+    font-size: var(--stat-bio-size, 1.6em);
+    display: var(--stat-bio-display, flex);
 }
 
 .card-image-placeholder {

@@ -58,11 +58,32 @@ const a11yRatio = document.getElementById('a11yRatio');
 const imageUploadInput = document.getElementById('imageUploadInput');
 
 // --- Global State ---
+const AUTOSAVE_KEY = 'deckmaker_autosave';
+const PRESETS_STORAGE_KEY = 'deckmaker_presets';
+
 let parsedCsvData = [];
 let cardCategories = new Set();
 let cardTitles = new Set();
+let titleCounts = {};
 let activeImagePlaceholder = null;
 let backsideMappings = {}; // Store Category -> Back Card Title Mappings
+let savedScrollPos = 0;
+
+// Stat Icons bindings
+const statBuoyVisible = document.getElementById('statBuoyVisible');
+const statBuoyIcon = document.getElementById('statBuoyIcon');
+const statBuoySize = document.getElementById('statBuoySize');
+const statBuoyColor = document.getElementById('statBuoyIconColor');
+
+const statMinVisible = document.getElementById('statMinVisible');
+const statMinIcon = document.getElementById('statMinIcon');
+const statMinSize = document.getElementById('statMinSize');
+const statMinColor = document.getElementById('statMinIconColor');
+
+const statBioVisible = document.getElementById('statBioVisible');
+const statBioIcon = document.getElementById('statBioIcon');
+const statBioSize = document.getElementById('statBioSize');
+const statBioColor = document.getElementById('statBioIconColor');
 
 // Stores styling state globally. 
 // Format: { "cat_Upgrade": { bg: "#fff", ... }, "card_Experimental Chassis": { bg: ... }, "all": { ... } }
@@ -86,9 +107,59 @@ let categoryStyles = {
         size: "1",
         wordBreak: false,
         showBuoy: true,
+        // Buoyancy defaults
+        buoyVisible: true,
+        buoyIcon: "arrow_downward",
+        buoySize: "1.1",
+        buoyColor: "#ffffff",
+        // Mineral Pts defaults
+        minVisible: true,
+        minIcon: "diamond",
+        minSize: "1.6",
+        minColor: "#1f2937",
+        // Bio Pts defaults
+        bioVisible: true,
+        bioIcon: "eco",
+        bioSize: "1.6",
+        bioColor: "#1f2937",
         customTexts: []
     }
 };
+
+// Map controls to their respective property names in `categoryStyles`
+const simpleBindings = [
+    { el: bgColorPicker, textEl: bgColorText, prop: 'bg' },
+    { el: fgScaleSlider, prop: 'fgScale' },
+    { el: fgHeightSlider, prop: 'fgHeight' },
+    { el: fgPosXSlider, prop: 'fgPosX' },
+    { el: fgPosYSlider, prop: 'fgPosY' },
+    { el: bgScaleSlider, prop: 'bgScale' },
+    { el: bgPosXSlider, prop: 'bgPosX' },
+    { el: bgPosYSlider, prop: 'bgPosY' },
+    { el: overlayOpacitySlider, prop: 'overlayOpacity' },
+    { el: overlayColorPicker, prop: 'overlayColor' },
+    { el: textColorPicker, textEl: textColorText, prop: 'text' },
+    { el: accentColorPicker, textEl: accentColorText, prop: 'accent' },
+    { el: fontSizeSlider, prop: 'size' },
+    { el: showBuoyancyToggle, prop: 'showBuoy', type: 'checkbox' },
+    { el: wordBreakToggle, prop: 'wordBreak', type: 'checkbox' },
+
+    // New Stat Bindings
+    { el: statBuoyVisible, prop: 'buoyVisible', type: 'checkbox' },
+    { el: statBuoyIcon, prop: 'buoyIcon' },
+    { el: statBuoySize, prop: 'buoySize' },
+    { el: statBuoyColor, prop: 'buoyColor' },
+
+    { el: statMinVisible, prop: 'minVisible', type: 'checkbox' },
+    { el: statMinIcon, prop: 'minIcon' },
+    { el: statMinSize, prop: 'minSize' },
+    { el: statMinColor, prop: 'minColor' },
+
+    { el: statBioVisible, prop: 'bioVisible', type: 'checkbox' },
+    { el: statBioIcon, prop: 'bioIcon' },
+    { el: statBioSize, prop: 'bioSize' },
+    { el: statBioColor, prop: 'bioColor' }
+];
 
 // --- Event Listeners ---
 csvFileInput.addEventListener('change', handleFileUpload);
@@ -101,10 +172,28 @@ let redoStack = [];
 const MAX_HISTORY = 50;
 let copiedStyles = null;
 
+// The Auto-Save system ensures that if the user refreshes without explicitly saving a "Preset", their working deck isn't wiped out!
+
+function triggerAutoSave() {
+    if (!parsedCsvData || parsedCsvData.length === 0) return;
+    const saveBlob = {
+        deck: JSON.parse(JSON.stringify(parsedCsvData)),
+        styles: JSON.parse(JSON.stringify(categoryStyles)),
+        mappings: JSON.parse(JSON.stringify(backsideMappings))
+    };
+    try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(saveBlob));
+    } catch (e) {
+        console.warn("AutoSave failed (Likely Quota Exceeded):", e);
+        // We don't alert loudly here because AutoSave happens constantly on every click/drag
+    }
+}
+
 function saveStateToHistory() {
     undoStack.push(JSON.stringify(categoryStyles));
     if (undoStack.length > MAX_HISTORY) undoStack.shift();
     redoStack = []; // Clear future redos when branching history
+    triggerAutoSave();
 }
 
 function handleUndo() {
@@ -197,11 +286,8 @@ targetCategory.addEventListener('change', () => {
         mappingTargetSelect.dispatchEvent(new Event('change'));
     }
     // Sync back button
-    if (targetCategory.value !== 'all') {
-        backToAllBtn.style.display = 'inline-flex';
-    } else {
-        backToAllBtn.style.display = 'none';
-
+    if (targetCategory.value === 'all') {
+        if (backToAllBtn) backToAllBtn.style.display = 'none';
         // Restore scroll position
         if (savedScrollPos > 0) {
             // Need a slight timeout to let DOM render the grid before scrolling
@@ -209,59 +295,69 @@ targetCategory.addEventListener('change', () => {
                 window.scrollTo({ top: savedScrollPos, behavior: 'smooth' });
             }, 50);
         }
+    } else {
+        if (backToAllBtn) backToAllBtn.style.display = 'flex';
     }
-});
-
-backToAllBtn.addEventListener('click', () => {
-    targetCategory.value = 'all';
-    targetCategory.dispatchEvent(new Event('change'));
-
     // Scroll sidebar to top so user sees the newly expanded controls
     const sidebar = document.querySelector('.sidebar');
     if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// Color Picker Helpers
-function syncColorInput(picker, textInput, property) {
-    picker.addEventListener('mousedown', saveStateToHistory);
-    textInput.addEventListener('focus', saveStateToHistory);
-
-    // When swatch changes, update text and apply globally
-    picker.addEventListener('input', () => {
-        textInput.value = picker.value;
-        applyStyle(property, picker.value);
-    });
-
-    // When text changes, validate hex, update swatch and apply globally
-    const handleTextChange = () => {
-        let val = textInput.value.trim();
-        // Add hash if missing
-        if (val && !val.startsWith('#')) val = '#' + val;
-
-        // Check if vaild hex color
-        if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
-            // normalise to 6 char hex
-            if (val.length === 4) {
-                val = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
-            }
-            picker.value = val;
-            textInput.value = val;
-            applyStyle(property, val);
-        }
-    };
-
-    textInput.addEventListener('change', handleTextChange);
-    textInput.addEventListener('keyup', (e) => {
-        if (e.key === 'Enter') handleTextChange();
+if (backToAllBtn) {
+    backToAllBtn.addEventListener('click', () => {
+        targetCategory.value = 'all';
+        targetCategory.dispatchEvent(new Event('change'));
     });
 }
 
-// Attach sync logic to the 5 color inputs
+// Color Picker Helpers
+function syncColorInput(picker, textInput, propName) {
+    if (!picker) return;
+
+    picker.addEventListener('input', () => {
+        applyStyle(propName, picker.value);
+        if (textInput) textInput.value = picker.value;
+    });
+
+    picker.addEventListener('change', () => {
+        saveStateToHistory();
+    });
+
+    if (textInput) {
+        const handleTextChange = () => {
+            let val = textInput.value.trim();
+            if (val && !val.startsWith('#')) val = '#' + val;
+
+            if (/^#[0-9A-F]{6}$/i.test(val) || /^#[0-9A-F]{3}$/i.test(val)) {
+                if (val.length === 4) {
+                    val = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+                }
+                picker.value = val;
+                applyStyle(propName, val);
+                saveStateToHistory();
+            } else if (textInput) {
+                textInput.value = picker.value;
+            }
+        };
+
+        textInput.addEventListener('change', handleTextChange);
+        textInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') handleTextChange();
+        });
+        textInput.addEventListener('focus', saveStateToHistory);
+    }
+}
+
+// Attach sync logic to the color inputs
 syncColorInput(bgColorPicker, bgColorText, 'bg');
 syncColorInput(overlayColorPicker, overlayColorText, 'overlayColor');
 syncColorInput(textColorPicker, textColorText, 'text');
 syncColorInput(accentColorPicker, accentColorText, 'accent');
-syncColorInput(document.getElementById('redFilterColorPicker'), document.getElementById('redFilterColorText'), 'redFilter');
+
+// Attach sync logic for stat color inputs
+syncColorInput(statBuoyColor, document.getElementById('statBuoyColorText'), 'buoyColor');
+syncColorInput(statMinColor, document.getElementById('statMinColorText'), 'minColor');
+syncColorInput(statBioColor, document.getElementById('statBioColorText'), 'bioColor');
 
 bgImageUpload.addEventListener('change', handleBgImageUpload);
 removeBgImageBtn.addEventListener('click', () => {
@@ -272,11 +368,9 @@ removeBgImageBtn.addEventListener('click', () => {
 
 // Dynamic Range Track Slider Background updates
 function updateSliderBackground(slider) {
-    const min = parseFloat(slider.min) || 0;
-    const max = parseFloat(slider.max) || 100;
-    const val = parseFloat(slider.value);
-    const percentage = ((val - min) / (max - min)) * 100;
-    slider.style.background = `linear-gradient(to right, #005fb2 0%, #005fb2 ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+    if (!slider) return;
+    const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+    slider.style.background = `linear-gradient(to right, var(--accent-light) 0%, var(--accent-color) ${value}%, var(--border-color) ${value}%, var(--border-color) 100%)`;
 }
 
 function bindSlider(slider, propertyName) {
@@ -302,6 +396,11 @@ bindSlider(fgPosYSlider, 'fgPosY');
 bindSlider(overlayOpacitySlider, 'overlayOpacity');
 bindSlider(fontSizeSlider, 'size');
 
+// Bind stat sliders
+bindSlider(statBuoySize, 'buoySize');
+bindSlider(statMinSize, 'minSize');
+bindSlider(statBioSize, 'bioSize');
+
 clearOverlayBtn.addEventListener('click', () => {
     saveStateToHistory();
     // Reset the internal model representations by applying the default values
@@ -320,6 +419,17 @@ fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider
 wordBreakToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('wordBreak', wordBreakToggle.checked); });
 showBuoyancyToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('showBuoy', showBuoyancyToggle.checked); });
 addCustomTextBtn.addEventListener('click', handleAddCustomText);
+
+// Bind stat icon selectors and checkboxes
+statBuoyVisible.addEventListener('change', () => { saveStateToHistory(); applyStyle('buoyVisible', statBuoyVisible.checked); });
+statBuoyIcon.addEventListener('change', () => { saveStateToHistory(); applyStyle('buoyIcon', statBuoyIcon.value); });
+
+statMinVisible.addEventListener('change', () => { saveStateToHistory(); applyStyle('minVisible', statMinVisible.checked); });
+statMinIcon.addEventListener('change', () => { saveStateToHistory(); applyStyle('minIcon', statMinIcon.value); });
+
+statBioVisible.addEventListener('change', () => { saveStateToHistory(); applyStyle('bioVisible', statBioVisible.checked); });
+statBioIcon.addEventListener('change', () => { saveStateToHistory(); applyStyle('bioIcon', statBioIcon.value); });
+
 
 // Backside Mapping Listeners
 mappingTargetSelect.addEventListener('change', () => {
@@ -343,6 +453,36 @@ mappingBacksideSelect.addEventListener('change', () => {
 
 // Image Upload Listener
 imageUploadInput.addEventListener('change', handleImageSelection);
+
+// Add Blank Custom Card Listener
+const addBlankCardBtn = document.getElementById('addBlankCardBtn');
+addBlankCardBtn.addEventListener('click', () => {
+    // Determine the next available Blank Custom count to prevent ID collisions
+    let blankCount = 1;
+    if (parsedCsvData) {
+        blankCount = parsedCsvData.filter(row => row.Card_Title && row.Card_Title.startsWith('Blank Custom')).length + 1;
+    } else {
+        parsedCsvData = []; // Initialize if no CSV was ever loaded
+    }
+
+    const blankRow = {
+        Card_Title: `Blank Custom ${blankCount}`,
+        Card_Type: 'Blank',
+        Qty: '1'
+    };
+
+    parsedCsvData.push(blankRow);
+
+    // Save history so they can undo adding the card
+    saveStateToHistory();
+
+    // Rerender the deck to show the new card
+    generateCards();
+
+    // Auto-save the deck structure to localStorage
+    triggerAutoSave();
+});
+
 
 /**
  * Handles the CSV file upload
@@ -466,100 +606,175 @@ function generateCards() {
             let badgesHTML = '';
             // We consistently inject the badge html if there's data, and let 'display: flex|none' 
             // from the CSS toggle it dynamically from the Styling Panel so sizing doesn't break.
-            if (rowData.Buoy_Mod) badgesHTML += `<span class="stat-badge buoy-badge">Buoyancy: ${escapeHTML(rowData.Buoy_Mod)}</span>`;
+            if (rowData.Buoy_Mod) {
+                badgesHTML += `<div class="stat-badge buoy-badge" style="display: flex; align-items: center; gap: 4px;">
+                    <span class="material-icons" style="font-size: 1.1em;">arrow_downward</span> 
+                    <span>${escapeHTML(rowData.Buoy_Mod)}</span>
+                </div>`;
+            }
 
-            // Add Duplicate Button explicitly
-            const duplicateBtnHTML = `<button class="duplicate-card-btn material-icons" title="Duplicate this Card" data-index="${parsedCsvData.indexOf(rowData)}">content_copy</button>`;
+            // Add Action Buttons explicitly
+            const actionBtnsHTML = `
+                <div class="card-action-btns">
+                    <button class="duplicate-card-btn material-icons" title="Duplicate this Card" data-index="${parsedCsvData.indexOf(rowData)}">content_copy</button>
+                    <button class="delete-card-btn material-icons" title="Delete this Card" data-index="${parsedCsvData.indexOf(rowData)}">delete</button>
+                </div>
+            `;
 
             // Build Points HTML (Body)
             let pointsHTML = '';
             if (rowData.Min_Pts || rowData.Bio_Pts) {
-                pointsHTML = `<div class="card-points" style="margin: 0.05in 0; font-weight: 600; font-size: 0.6rem; color: var(--dynamic-card-accent);">`;
-                if (rowData.Min_Pts) pointsHTML += `<span style="margin-right: 0.1in;">Mineral Pts: ${escapeHTML(rowData.Min_Pts)}</span>`;
-                if (rowData.Bio_Pts) pointsHTML += `<span>Bio Pts: ${escapeHTML(rowData.Bio_Pts)}</span>`;
+                pointsHTML = `<div class="card-points" style="margin: 0.05in 0; font-weight: 600; font-size: 0.6rem; color: var(--dynamic-card-accent); display: flex; align-items: center; gap: 0.15in;">`;
+                if (rowData.Min_Pts) {
+                    pointsHTML += `<span class="stat-min" style="display: flex; align-items: center; gap: 2px;">
+                        <span class="material-icons">diamond</span>
+                        ${escapeHTML(rowData.Min_Pts)}
+                    </span>`;
+                }
+                if (rowData.Bio_Pts) {
+                    pointsHTML += `<span class="stat-bio" style="display: flex; align-items: center; gap: 2px;">
+                        <span class="material-icons">eco</span>
+                        ${escapeHTML(rowData.Bio_Pts)}
+                    </span>`;
+                }
                 pointsHTML += `</div>`;
             }
 
-            cardEl.innerHTML = `
-                <div class="card-bg-layer"></div>
-                <div class="card-overlay-layer"></div>
-                ${duplicateBtnHTML}
-                <div class="card-type-banner"></div>
-                <div class="card-header">
-                    <h3 class="card-title">${escapeHTML(title)}</h3>
-                    <div class="card-stats">${badgesHTML}</div>
-                </div>
-                
-                <div class="card-image-placeholder">Click to add illustration</div>
-                
-                <div class="card-body">
-                    ${rowData.Standard_Text ? `<div class="card-standard-text">${escapeHTML(rowData.Standard_Text)}</div>` : ''}
-                    ${pointsHTML}
-                    ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
-                    ${rowData.Mechanic_Action ? `<div class="card-mechanic">${escapeHTML(rowData.Mechanic_Action)}</div>` : ''}
-                    ${rowData.Flavor_Text ? `<div class="card-flavor">${escapeHTML(rowData.Flavor_Text).replace(/\n/g, '<br>')}</div>` : ''}
-                </div>
-                ${rowData.Card_ID ? `<div class="card-id-footer">${escapeHTML(rowData.Card_ID)}</div>` : ''}
-            `;
+            // Blank cards render with no content — just the bg/overlay layers and action buttons
+            if (type === 'Blank') {
+                cardEl.innerHTML = `
+                    <div class="card-bg-layer"></div>
+                    <div class="card-overlay-layer"></div>
+                    ${actionBtnsHTML}
+                `;
+            } else {
+                cardEl.innerHTML = `
+                    <div class="card-bg-layer"></div>
+                    <div class="card-overlay-layer"></div>
+                    ${actionBtnsHTML}
+                    <div class="card-type-banner"></div>
+                    <div class="card-header">
+                        <h3 class="card-title">${escapeHTML(title)}</h3>
+                        <div class="card-stats">${badgesHTML}</div>
+                    </div>
+                    
+                    <div class="card-image-placeholder">Click to add illustration</div>
+                    
+                    <div class="card-body">
+                        ${rowData.Standard_Text ? `<div class="card-standard-text">${escapeHTML(rowData.Standard_Text)}</div>` : ''}
+                        ${pointsHTML}
+                        ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
+                        ${rowData.Mechanic_Action ? `<div class="card-mechanic">${escapeHTML(rowData.Mechanic_Action)}</div>` : ''}
+                        ${rowData.Flavor_Text ? `<div class="card-flavor">${escapeHTML(rowData.Flavor_Text).replace(/\n/g, '<br>')}</div>` : ''}
+                    </div>
+                    ${rowData.Card_ID ? `<div class="card-id-footer">${escapeHTML(rowData.Card_ID)}</div>` : ''}
+                `;
+            }
 
-            // Attach click/drag/scroll listener for Image
+            // Attach click/drag/scroll listener for Image (only on non-blank cards)
             const imgPlaceholder = cardEl.querySelector('.card-image-placeholder');
 
-            let isImgDragging = false;
-            let startX, startY;
-            let startPosX, startPosY;
-            let hasDragged = false;
+            if (imgPlaceholder) {
+                let isImgDragging = false;
+                let startX, startY;
+                let startPosX, startPosY;
+                let hasDragged = false;
 
-            imgPlaceholder.addEventListener('mousedown', (e) => {
-                if (!imgPlaceholder.classList.contains('has-image')) return;
-                saveStateToHistory();
-                isImgDragging = true;
-                hasDragged = false;
-                startX = e.clientX;
-                startY = e.clientY;
+                imgPlaceholder.addEventListener('mousedown', (e) => {
+                    if (!imgPlaceholder.classList.contains('has-image')) return;
+                    saveStateToHistory();
+                    isImgDragging = true;
+                    hasDragged = false;
+                    startX = e.clientX;
+                    startY = e.clientY;
 
-                // Auto-select this card so image manipulations are strictly localized
-                selectCardTarget(sysId);
+                    // Auto-select this card so image manipulations are strictly localized
+                    selectCardTarget(sysId);
 
-                // Read current values
-                const currentX = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-x')) || 50;
-                const currentY = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-y')) || 50;
-                startPosX = currentX;
-                startPosY = currentY;
+                    // Read current values
+                    const currentX = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-x')) || 50;
+                    const currentY = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-pos-y')) || 50;
+                    startPosX = currentX;
+                    startPosY = currentY;
 
-                e.preventDefault(); // Prevent text selection
-            });
+                    e.preventDefault(); // Prevent text selection
+                });
 
-            document.addEventListener('mousemove', (e) => {
-                if (!isImgDragging) return;
+                document.addEventListener('mousemove', (e) => {
+                    if (!isImgDragging) return;
 
-                const deltaX = e.clientX - startX;
-                const deltaY = e.clientY - startY;
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
 
-                if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) hasDragged = true;
+                    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) hasDragged = true;
 
-                // Sensitivity multiplier (adjustable)
-                const sensitivity = 0.2;
-                let newX = startPosX - (deltaX * sensitivity);
-                let newY = startPosY - (deltaY * sensitivity);
+                    // Sensitivity multiplier (adjustable)
+                    const sensitivity = 0.2;
+                    let newX = startPosX - (deltaX * sensitivity);
+                    let newY = startPosY - (deltaY * sensitivity);
 
-                // Clamping
-                newX = Math.max(0, Math.min(100, newX));
-                newY = Math.max(0, Math.min(100, newY));
+                    // Clamping
+                    newX = Math.max(0, Math.min(100, newX));
+                    newY = Math.max(0, Math.min(100, newY));
 
-                cardEl.style.setProperty('--dynamic-card-fg-pos-x', `${newX}%`);
-                cardEl.style.setProperty('--dynamic-card-fg-pos-y', `${newY}%`);
-            });
+                    cardEl.style.setProperty('--dynamic-card-fg-pos-x', `${newX}%`);
+                    cardEl.style.setProperty('--dynamic-card-fg-pos-y', `${newY}%`);
+                });
 
-            document.addEventListener('mouseup', (e) => {
-                if (!isImgDragging) return;
-                isImgDragging = false;
+                document.addEventListener('mouseup', (e) => {
+                    if (!isImgDragging) return;
+                    isImgDragging = false;
 
-                if (hasDragged) {
+                    if (hasDragged) {
+                        // Save to state
+                        const newX = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-x'));
+                        const newY = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-y'));
+
+                        const tCategory = targetCategory.value;
+                        let shouldSave = false;
+
+                        if (tCategory === 'all') shouldSave = true;
+                        else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
+                        else if (tCategory.startsWith('card_') && cardEl.dataset.sysId === tCategory.substring(5)) shouldSave = true;
+
+                        if (shouldSave && categoryStyles[tCategory]) {
+                            categoryStyles[tCategory].fgPosX = newX;
+                            categoryStyles[tCategory].fgPosY = newY;
+                            fgPosXSlider.value = newX;
+                            fgPosYSlider.value = newY;
+                            updateSliderBackground(fgPosXSlider);
+                            updateSliderBackground(fgPosYSlider);
+                            resetPresetButtons();
+                        }
+                    }
+                });
+
+                // Zoom via Mouse Wheel
+                let zoomTimeout;
+                imgPlaceholder.addEventListener('wheel', (e) => {
+                    if (!imgPlaceholder.classList.contains('has-image')) return;
+                    e.preventDefault();
+
+                    if (!zoomTimeout) saveStateToHistory();
+                    clearTimeout(zoomTimeout);
+                    zoomTimeout = setTimeout(() => { zoomTimeout = null; }, 500);
+
+                    // Auto-select this card so image manipulations are strictly localized
+                    selectCardTarget(sysId);
+
+                    const currentScale = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-size')) || 100;
+
+                    // Zoom direction
+                    const zoomAmount = 5;
+                    let newScale = currentScale;
+                    if (e.deltaY > 0) newScale -= zoomAmount; // Scroll down = zoom out
+                    else if (e.deltaY < 0) newScale += zoomAmount; // Scroll up = zoom in
+
+                    newScale = Math.max(10, Math.min(300, newScale));
+
+                    cardEl.style.setProperty('--dynamic-card-fg-size', `${newScale}%`);
+
                     // Save to state
-                    const newX = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-x'));
-                    const newY = parseFloat(cardEl.style.getPropertyValue('--dynamic-card-fg-pos-y'));
-
                     const tCategory = targetCategory.value;
                     let shouldSave = false;
 
@@ -568,63 +783,20 @@ function generateCards() {
                     else if (tCategory.startsWith('card_') && cardEl.dataset.sysId === tCategory.substring(5)) shouldSave = true;
 
                     if (shouldSave && categoryStyles[tCategory]) {
-                        categoryStyles[tCategory].fgPosX = newX;
-                        categoryStyles[tCategory].fgPosY = newY;
-                        fgPosXSlider.value = newX;
-                        fgPosYSlider.value = newY;
-                        updateSliderBackground(fgPosXSlider);
-                        updateSliderBackground(fgPosYSlider);
+                        categoryStyles[tCategory].fgScale = newScale;
+                        fgScaleSlider.value = newScale;
+                        updateSliderBackground(fgScaleSlider);
                         resetPresetButtons();
                     }
-                }
-            });
+                });
 
-            // Zoom via Mouse Wheel
-            let zoomTimeout;
-            imgPlaceholder.addEventListener('wheel', (e) => {
-                if (!imgPlaceholder.classList.contains('has-image')) return;
-                e.preventDefault();
+                imgPlaceholder.addEventListener('click', () => {
+                    if (hasDragged) return; // Prevent upload dialog if we just finished dragging
+                    activeImagePlaceholder = imgPlaceholder;
+                    imageUploadInput.click();
+                });
+            } // end if (imgPlaceholder)
 
-                if (!zoomTimeout) saveStateToHistory();
-                clearTimeout(zoomTimeout);
-                zoomTimeout = setTimeout(() => { zoomTimeout = null; }, 500);
-
-                // Auto-select this card so image manipulations are strictly localized
-                selectCardTarget(sysId);
-
-                const currentScale = parseFloat(getComputedStyle(cardEl).getPropertyValue('--dynamic-card-fg-size')) || 100;
-
-                // Zoom direction
-                const zoomAmount = 5;
-                let newScale = currentScale;
-                if (e.deltaY > 0) newScale -= zoomAmount; // Scroll down = zoom out
-                else if (e.deltaY < 0) newScale += zoomAmount; // Scroll up = zoom in
-
-                newScale = Math.max(10, Math.min(300, newScale));
-
-                cardEl.style.setProperty('--dynamic-card-fg-size', `${newScale}%`);
-
-                // Save to state
-                const tCategory = targetCategory.value;
-                let shouldSave = false;
-
-                if (tCategory === 'all') shouldSave = true;
-                else if (tCategory.startsWith('cat_') && cardEl.dataset.category === tCategory.substring(4)) shouldSave = true;
-                else if (tCategory.startsWith('card_') && cardEl.dataset.sysId === tCategory.substring(5)) shouldSave = true;
-
-                if (shouldSave && categoryStyles[tCategory]) {
-                    categoryStyles[tCategory].fgScale = newScale;
-                    fgScaleSlider.value = newScale;
-                    updateSliderBackground(fgScaleSlider);
-                    resetPresetButtons();
-                }
-            });
-
-            imgPlaceholder.addEventListener('click', () => {
-                if (hasDragged) return; // Prevent upload dialog if we just finished dragging
-                activeImagePlaceholder = imgPlaceholder;
-                imageUploadInput.click();
-            });
 
             // Apply existing styles immediately on generation
             applyStoredStyles(cardEl, type, sysId);
@@ -656,6 +828,22 @@ function generateCards() {
 
             // Click-to-Select Card logic
             cardEl.addEventListener('click', (e) => {
+                // Handle Delete Card Click
+                if (e.target.classList.contains('delete-card-btn')) {
+                    const rowIdx = parseInt(e.target.dataset.index, 10);
+                    if (!isNaN(rowIdx)) {
+                        if (confirm(`Are you sure you want to delete this card?`)) {
+                            parsedCsvData.splice(rowIdx, 1);
+
+                            setTimeout(() => {
+                                generateCards();
+                                triggerAutoSave();
+                            }, 10);
+                        }
+                        return;
+                    }
+                }
+
                 // Handle Duplicate Card Click
                 if (e.target.classList.contains('duplicate-card-btn')) {
                     const rowIdx = parseInt(e.target.dataset.index, 10);
@@ -688,7 +876,10 @@ function generateCards() {
 
                         // Re-render
                         // Wait a tiny fraction so the click event finishes propagating before we destroy the DOM
-                        setTimeout(() => generateCards(), 10);
+                        setTimeout(() => {
+                            generateCards();
+                            triggerAutoSave();
+                        }, 10);
                         return;
                     }
                 }
@@ -789,7 +980,6 @@ async function handleImageSelection(event) {
 /**
  * --- Bulk Styling & Targeting Logic ---
  */
-let savedScrollPos = 0;
 
 function selectCardTarget(title) {
     const exactCardOpt = Array.from(targetCategory.options).find(opt => opt.value === `card_${title}`);
@@ -816,10 +1006,6 @@ function updateCategoryDropdown() {
     const catGroup = document.createElement('optgroup');
     catGroup.label = "By Category";
     cardCategories.forEach(cat => {
-        // Only clone if missing and not a backside
-        if (!categoryStyles["cat_" + cat] && !cat.startsWith('Back_')) {
-            categoryStyles["cat_" + cat] = JSON.parse(JSON.stringify(categoryStyles["all"]));
-        }
         const opt = document.createElement('option');
         opt.value = "cat_" + cat;
         opt.textContent = `Category: ${cat}`;
@@ -836,18 +1022,7 @@ function updateCategoryDropdown() {
         const baseTitle = cardEl ? cardEl.dataset.title : sysId;
         const isBackside = catName ? catName.startsWith('Back_') : false;
 
-        // Only deep clone inherited texts if it is a frontside card.
-        // Critically, we MUST inherit from the specific Category (if styled) so we don't accidentally overwrite category layouts with global defaults!
-        if (!categoryStyles["card_" + sysId] && !isBackside) {
-            const sourceStyles = (catName && categoryStyles["cat_" + catName])
-                ? categoryStyles["cat_" + catName]
-                : categoryStyles["all"];
-            categoryStyles["card_" + sysId] = JSON.parse(JSON.stringify(sourceStyles));
-        } else if (!categoryStyles["card_" + sysId] && isBackside) {
-            // Blank slate for backsides since they exclude 'all' inherited texts
-            categoryStyles["card_" + sysId] = { customTexts: [] };
-        }
-
+        // Create the dropdown option directly without pre-initializing a permanent categoryStyles override
         const opt = document.createElement('option');
         opt.value = "card_" + sysId;
 
@@ -881,38 +1056,87 @@ function highlightSelectedCard() {
     });
 }
 
+function getEffectiveStyles(target, knownCategory) {
+    const baseGlobal = categoryStyles["all"] || {};
+    if (target === 'all') return baseGlobal;
+
+    if (target.startsWith('cat_')) {
+        const catName = target.substring(4);
+        const isBackside = catName.startsWith('Back_');
+        const baseCat = categoryStyles[target] || {};
+        if (isBackside) return { ...baseCat };
+        return { ...baseGlobal, ...baseCat };
+    }
+
+    if (target.startsWith('card_')) {
+        const sysId = target.substring(5);
+        // Use knownCategory if provided (avoids DOM query when card isn't in DOM yet)
+        let catName = knownCategory || null;
+        if (!catName) {
+            const cardEl = document.querySelector(`.game-card[data-sys-id="${CSS.escape(sysId)}"]`);
+            catName = cardEl ? cardEl.dataset.category : null;
+        }
+        const isBackside = catName ? catName.startsWith('Back_') : false;
+
+        const baseCat = catName ? (categoryStyles["cat_" + catName] || {}) : {};
+        const baseCard = categoryStyles[target] || {};
+
+        if (isBackside) return { ...baseCat, ...baseCard };
+        return { ...baseGlobal, ...baseCat, ...baseCard };
+    }
+    return baseGlobal;
+}
+
 function updateControlsToMatchCategory() {
     const target = targetCategory.value;
-    const styles = categoryStyles[target];
+    const styles = getEffectiveStyles(target);
 
-    // 1. Sync the UI controls if we have stored styles for this target
     // 1. Sync the UI controls if we have stored styles for this target
     if (styles) {
-        bgColorPicker.value = styles.bg;
-        bgColorText.value = styles.bg;
-        if (!styles.bgImage || styles.bgImage === 'none') {
+        if (bgColorPicker) bgColorPicker.value = styles.bg;
+        if (bgColorText) bgColorText.value = styles.bg;
+        if (bgImageUpload && (!styles.bgImage || styles.bgImage === 'none')) {
             bgImageUpload.value = '';
         }
-        bgScaleSlider.value = styles.bgScale !== undefined ? styles.bgScale : "100";
-        bgPosXSlider.value = styles.bgPosX !== undefined ? styles.bgPosX : "50";
-        bgPosYSlider.value = styles.bgPosY !== undefined ? styles.bgPosY : "50";
-        fgScaleSlider.value = styles.fgScale !== undefined ? styles.fgScale : "100";
-        fgHeightSlider.value = styles.fgHeight !== undefined ? styles.fgHeight : "1";
-        fgPosXSlider.value = styles.fgPosX !== undefined ? styles.fgPosX : "50";
-        fgPosYSlider.value = styles.fgPosY !== undefined ? styles.fgPosY : "50";
-        overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
-        overlayColorText.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
-        overlayOpacitySlider.value = styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0";
-        textColorPicker.value = styles.text;
-        textColorText.value = styles.text;
-        accentColorPicker.value = styles.accent;
-        accentColorText.value = styles.accent;
+        if (bgScaleSlider) bgScaleSlider.value = styles.bgScale !== undefined ? styles.bgScale : "100";
+        if (bgPosXSlider) bgPosXSlider.value = styles.bgPosX !== undefined ? styles.bgPosX : "50";
+        if (bgPosYSlider) bgPosYSlider.value = styles.bgPosY !== undefined ? styles.bgPosY : "50";
+        if (fgScaleSlider) fgScaleSlider.value = styles.fgScale !== undefined ? styles.fgScale : "100";
+        if (fgHeightSlider) fgHeightSlider.value = styles.fgHeight !== undefined ? styles.fgHeight : "1";
+        if (fgPosXSlider) fgPosXSlider.value = styles.fgPosX !== undefined ? styles.fgPosX : "50";
+        if (fgPosYSlider) fgPosYSlider.value = styles.fgPosY !== undefined ? styles.fgPosY : "50";
+        if (overlayColorPicker) overlayColorPicker.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
+        if (overlayColorText) overlayColorText.value = styles.overlayColor !== undefined ? styles.overlayColor : "#ffffff";
+        if (overlayOpacitySlider) overlayOpacitySlider.value = styles.overlayOpacity !== undefined ? styles.overlayOpacity : "0";
+        if (textColorPicker) textColorPicker.value = styles.text;
+        if (textColorText) textColorText.value = styles.text;
+        if (accentColorPicker) accentColorPicker.value = styles.accent;
+        if (accentColorText) accentColorText.value = styles.accent;
 
         // Sync Typography Controls
-        fontFamilySelect.value = styles.font;
-        fontSizeSlider.value = styles.size;
-        wordBreakToggle.checked = styles.wordBreak;
-        showBuoyancyToggle.checked = (styles.showBuoy !== undefined) ? styles.showBuoy : true;
+        if (fontFamilySelect) fontFamilySelect.value = styles.font;
+        if (fontSizeSlider) fontSizeSlider.value = styles.size;
+        if (wordBreakToggle) wordBreakToggle.checked = styles.wordBreak;
+        if (showBuoyancyToggle) showBuoyancyToggle.checked = (styles.showBuoy !== undefined) ? styles.showBuoy : true;
+
+        // Stat Icons
+        if (statBuoyVisible) statBuoyVisible.checked = (styles.buoyVisible !== undefined) ? styles.buoyVisible : true;
+        if (statBuoyIcon) statBuoyIcon.value = styles.buoyIcon || 'arrow_downward';
+        if (statBuoySize) statBuoySize.value = styles.buoySize || '1.1';
+        if (statBuoyColor) statBuoyColor.value = styles.buoyColor || '#ffffff';
+        if (document.getElementById('statBuoyColorText')) document.getElementById('statBuoyColorText').value = styles.buoyColor || '#ffffff';
+
+        if (statMinVisible) statMinVisible.checked = (styles.minVisible !== undefined) ? styles.minVisible : true;
+        if (statMinIcon) statMinIcon.value = styles.minIcon || 'diamond';
+        if (statMinSize) statMinSize.value = styles.minSize || '1.6';
+        if (statMinColor) statMinColor.value = styles.minColor || '#1f2937';
+        if (document.getElementById('statMinColorText')) document.getElementById('statMinColorText').value = styles.minColor || '#1f2937';
+
+        if (statBioVisible) statBioVisible.checked = (styles.bioVisible !== undefined) ? styles.bioVisible : true;
+        if (statBioIcon) statBioIcon.value = styles.bioIcon || 'eco';
+        if (statBioSize) statBioSize.value = styles.bioSize || '1.6';
+        if (statBioColor) statBioColor.value = styles.bioColor || '#1f2937';
+        if (document.getElementById('statBioColorText')) document.getElementById('statBioColorText').value = styles.bioColor || '#1f2937';
 
         // Repaint styling on all range tracks now that values shifted
         updateSliderBackground(bgScaleSlider);
@@ -924,6 +1148,9 @@ function updateControlsToMatchCategory() {
         updateSliderBackground(fgPosYSlider);
         updateSliderBackground(overlayOpacitySlider);
         updateSliderBackground(fontSizeSlider);
+        updateSliderBackground(statBuoySize);
+        updateSliderBackground(statMinSize);
+        updateSliderBackground(statBioSize);
     }
 
     // 2. Filter the UI Grid to ONLY show the targeted cards
@@ -1004,6 +1231,7 @@ function applyStyle(property, value) {
 }
 
 function hexToRgba(hex, opacity) {
+    if (!hex || typeof hex !== 'string') return `rgba(0, 0, 0, ${opacity})`;
     let r = 0, g = 0, b = 0;
     if (hex.length === 4) {
         r = parseInt(hex[1] + hex[1], 16);
@@ -1068,20 +1296,39 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     if (propName === 'showBuoy') {
         cardDiv.style.setProperty('--dynamic-card-buoy-display', value ? 'flex' : 'none');
     }
+
+    // Stat properties
+    if (propName === 'buoyVisible') cardDiv.style.setProperty('--stat-buoy-display', value ? 'flex' : 'none');
+    if (propName === 'buoyIcon') {
+        const buoyIconEl = cardDiv.querySelector('.buoy-badge .material-icons');
+        if (buoyIconEl) buoyIconEl.textContent = value;
+    }
+    if (propName === 'buoySize') cardDiv.style.setProperty('--stat-buoy-size', `${value}em`);
+    if (propName === 'buoyColor') cardDiv.style.setProperty('--stat-buoy-color', value);
+
+    if (propName === 'minVisible') cardDiv.style.setProperty('--stat-min-display', value ? 'flex' : 'none');
+    if (propName === 'minIcon') {
+        const minIconEl = cardDiv.querySelector('.stat-min .material-icons');
+        if (minIconEl) minIconEl.textContent = value;
+    }
+    if (propName === 'minSize') cardDiv.style.setProperty('--stat-min-size', `${value}em`);
+    if (propName === 'minColor') cardDiv.style.setProperty('--stat-min-color', value);
+
+    if (propName === 'bioVisible') cardDiv.style.setProperty('--stat-bio-display', value ? 'flex' : 'none');
+    if (propName === 'bioIcon') {
+        const bioIconEl = cardDiv.querySelector('.stat-bio .material-icons');
+        if (bioIconEl) bioIconEl.textContent = value;
+    }
+    if (propName === 'bioSize') cardDiv.style.setProperty('--stat-bio-size', `${value}em`);
+    if (propName === 'bioColor') cardDiv.style.setProperty('--stat-bio-color', value);
 }
 
 function applyStoredStyles(cardDiv, category, title) {
     const isBackside = category.startsWith('Back_');
-    const baseGlobal = categoryStyles["all"] || {};
-    const baseCat = categoryStyles["cat_" + category] || {};
-    let baseCard = categoryStyles["card_" + title];
+    const sysId = title;
 
-    // INFERENCE LOGIC: If this card has NO specific styling yet, infer its template from a sibling!
-    const sysId = title; // In the new system, 'title' arg passed to applyStoredStyles is actually the sysId
-
-    if (!baseCard && !isBackside && parsedCsvData && parsedCsvData.length > 0) {
-        // Since `applyStoredStyles` runs before all cards are appended to the DOM, we cannot use document.querySelector.
-        // Instead, we reconstruct the sysId iteration logic by scanning the CSV exactly as generateCards does.
+    // INFERENCE LOGIC: Check siblings if we have NO specific styling yet
+    if (!categoryStyles["card_" + sysId] && !isBackside && parsedCsvData && parsedCsvData.length > 0) {
         const siblings = [];
         const tempCounts = {};
 
@@ -1105,54 +1352,29 @@ function applyStoredStyles(cardDiv, category, title) {
             }
         });
 
-        // Search backwards to preferentially inherit from the most recently adjacent sibling
         const reversedSiblings = [...siblings].reverse();
-
         let chosenSiblingStyle = null;
-        let fallbackSiblingStyle = null;
 
         for (let sibSysId of reversedSiblings) {
             if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
-                const sStyle = categoryStyles["card_" + sibSysId];
-
-                // If a sibling has any dedicated card style stored, inherit from it!
-                // We don't need to aggressively check if it's different from the global base anymore,
-                // because merely having a `card_` key implies they clicked target and tweaked it.
-                chosenSiblingStyle = sStyle;
+                chosenSiblingStyle = categoryStyles["card_" + sibSysId];
                 break;
             }
         }
 
-        const styleToClone = chosenSiblingStyle || fallbackSiblingStyle;
-
-        if (styleToClone) {
-            // Clone the heavily-styled sibling so the new card inherits its exact layout
-            baseCard = JSON.parse(JSON.stringify(styleToClone));
-
-            // Clear the illustration so the user knows they need to upload a new one, but keep background/layout
+        if (chosenSiblingStyle) {
+            const baseCard = JSON.parse(JSON.stringify(chosenSiblingStyle));
             if (baseCard.fgImage) baseCard.fgImage = 'none';
-
-            // Generate fresh IDs for custom texts so dragging them doesn't move them on the sibling card!
             if (baseCard.customTexts) {
                 baseCard.customTexts.forEach(txt => {
                     txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
                 });
             }
-
-            categoryStyles["card_" + sysId] = baseCard; // Persist it
+            categoryStyles["card_" + sysId] = baseCard;
         }
     }
 
-    baseCard = baseCard || {};
-
-    let styles;
-    if (isBackside) {
-        // Backsides do not inherit from 'all'. They start blank, inherit category, then card overrides.
-        styles = { ...baseCat, ...baseCard };
-    } else {
-        // Frontsides inherit from 'all', then category, then card overrides.
-        styles = { ...baseGlobal, ...baseCat, ...baseCard };
-    }
+    const styles = getEffectiveStyles("card_" + sysId, category);
 
     updateCSSCustomProperty(cardDiv, 'bg', styles.bg !== undefined ? styles.bg : '#ffffff');
     updateCSSCustomProperty(cardDiv, 'bgImage', styles.bgImage !== undefined ? styles.bgImage : 'none');
@@ -1238,8 +1460,18 @@ function handleAddCustomText() {
     const target = targetCategory.value;
     const newText = { id: 'ctx_' + Date.now(), text: 'New Text', x: 50, y: 50 };
 
-    if (!categoryStyles[target]) categoryStyles[target] = JSON.parse(JSON.stringify(categoryStyles["all"]));
-    if (!categoryStyles[target].customTexts) categoryStyles[target].customTexts = [];
+    if (!categoryStyles[target]) {
+        categoryStyles[target] = {};
+    }
+    if (!categoryStyles[target].customTexts) {
+        // Copy inherited texts uniquely for this layer so we don't accidentally edit the parent's array
+        const effective = getEffectiveStyles(target);
+        categoryStyles[target].customTexts = effective.customTexts ? JSON.parse(JSON.stringify(effective.customTexts)) : [];
+        // Ensure new IDs for cloned templates
+        categoryStyles[target].customTexts.forEach(txt => {
+            txt.id = 'ctx_' + Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        });
+    }
     categoryStyles[target].customTexts.push(newText);
 
     // Sub-propagation
@@ -1352,6 +1584,14 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
 function updateCustomTextDataStore(id, updates) {
     const target = targetCategory.value;
 
+    if (!categoryStyles[target]) categoryStyles[target] = {};
+
+    let ownsText = categoryStyles[target].customTexts && categoryStyles[target].customTexts.some(t => t.id === id);
+    if (!ownsText) {
+        const effective = getEffectiveStyles(target);
+        categoryStyles[target].customTexts = effective.customTexts ? JSON.parse(JSON.stringify(effective.customTexts)) : [];
+    }
+
     const applyMerge = (stylesObj) => {
         if (stylesObj && stylesObj.customTexts) {
             const txt = stylesObj.customTexts.find(t => t.id === id);
@@ -1380,6 +1620,14 @@ function removeCustomText(id) {
     saveStateToHistory();
     const target = targetCategory.value;
 
+    if (!categoryStyles[target]) categoryStyles[target] = {};
+
+    let ownsText = categoryStyles[target].customTexts && categoryStyles[target].customTexts.some(t => t.id === id);
+    if (!ownsText) {
+        const effective = getEffectiveStyles(target);
+        categoryStyles[target].customTexts = effective.customTexts ? JSON.parse(JSON.stringify(effective.customTexts)) : [];
+    }
+
     // Sub-propagation removal
     if (target === 'all') {
         Object.keys(categoryStyles).forEach(key => {
@@ -1402,12 +1650,12 @@ function removeCustomText(id) {
             }
         });
         // Also remove from the category itself
-        if (categoryStyles[target] && categoryStyles[target].customTexts) {
+        if (categoryStyles[target].customTexts) {
             categoryStyles[target].customTexts = categoryStyles[target].customTexts.filter(t => t.id !== id);
         }
     } else {
         // Just the single card
-        if (categoryStyles[target] && categoryStyles[target].customTexts) {
+        if (categoryStyles[target].customTexts) {
             categoryStyles[target].customTexts = categoryStyles[target].customTexts.filter(t => t.id !== id);
         }
     }
@@ -1590,8 +1838,9 @@ function syncCustomTextContentUI(id, newText) {
  * --- Accessibility Checker (Contrast "Middleware") ---
  */
 
-// Convert HEX color to RGB object
+// Helper to convert hex to RGB
 function hexToRgb(hex) {
+    if (!hex || typeof hex !== 'string') return { r: 0, g: 0, b: 0 };
     let r = 0, g = 0, b = 0;
     // 3 digits
     if (hex.length === 4) {
@@ -1638,6 +1887,7 @@ function getContrastRatio(rgb1, rgb2) {
 
 function updateAccessibilityChecker() {
     if (!parsedCsvData || parsedCsvData.length === 0) return; // Wait until init
+    if (!a11yChecker || !a11yRatio || !a11yIcon || !a11yStatus) return; // Safety check for DOM elements
 
     const target = targetCategory.value;
     const styles = categoryStyles[target] || categoryStyles["all"];
@@ -1681,15 +1931,24 @@ function updateAccessibilityChecker() {
  * --- Preset Management Logic ---
  */
 
-const PRESETS_STORAGE_KEY = 'deckmaker_presets';
-
 function getLocalPresets() {
     const data = localStorage.getItem(PRESETS_STORAGE_KEY);
     return data ? JSON.parse(data) : {};
 }
 
 function saveLocalPresets(presets) {
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    try {
+        localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+        return true;
+    } catch (e) {
+        console.error("Local Storage Save Failed:", e);
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            alert("Error: Browser storage limit exceeded! This usually happens if you've uploaded very large background images. Please use the 'Export JSON' button instead to safely save your deck to your computer.");
+        } else {
+            alert("Failed to save preset to local browser storage.");
+        }
+        return false;
+    }
 }
 
 function populatePresetDropdown() {
@@ -1721,17 +1980,49 @@ function resetPresetButtons() {
     updatePresetBtn.classList.remove('btn-saved');
 }
 
+/**
+ * Build a fully-resolved styles map for persisting/exporting.
+ * Instead of exporting the sparse `categoryStyles` (which only contains explicit overrides),
+ * we walk every known card and category and resolve their FULL effective style via getEffectiveStyles.
+ * This ensures duplicate cards and backside templates that inherit styles are correctly captured.
+ */
+function resolveStylesForExport() {
+    const resolved = {};
+
+    // Always include the global base
+    resolved['all'] = JSON.parse(JSON.stringify(categoryStyles['all'] || {}));
+
+    // Resolve every category
+    cardCategories.forEach(cat => {
+        const key = 'cat_' + cat;
+        resolved[key] = JSON.parse(JSON.stringify(getEffectiveStyles(key)));
+    });
+
+    // Resolve every individual card
+    cardTitles.forEach(sysId => {
+        const key = 'card_' + sysId;
+        resolved[key] = JSON.parse(JSON.stringify(getEffectiveStyles(key)));
+    });
+
+    return resolved;
+}
+
 function handleSavePreset() {
     const name = prompt("Enter a name for this preset:");
     if (!name || name.trim() === '') return;
 
     const presets = getLocalPresets();
     presets[name.trim()] = {
-        styles: JSON.parse(JSON.stringify(categoryStyles)),
+        styles: resolveStylesForExport(),
         mappings: JSON.parse(JSON.stringify(backsideMappings)),
         deck: JSON.parse(JSON.stringify(parsedCsvData))
     };
-    saveLocalPresets(presets);
+
+    const success = saveLocalPresets(presets);
+    if (!success) {
+        resetPresetButtons();
+        return;
+    }
 
     populatePresetDropdown();
     presetSelect.value = name.trim();
@@ -1749,11 +2040,13 @@ function handleUpdatePreset() {
 
     const presets = getLocalPresets();
     presets[selected] = {
-        styles: JSON.parse(JSON.stringify(categoryStyles)),
+        styles: resolveStylesForExport(),
         mappings: JSON.parse(JSON.stringify(backsideMappings)),
         deck: JSON.parse(JSON.stringify(parsedCsvData))
     };
-    saveLocalPresets(presets);
+
+    const success = saveLocalPresets(presets);
+    if (!success) return;
 
     setPresetSavedState('update');
 }
@@ -1765,16 +2058,18 @@ function handleDeletePreset() {
     if (confirm(`Are you sure you want to delete preset "${selected}"?`)) {
         const presets = getLocalPresets();
         delete presets[selected];
-        saveLocalPresets(presets);
+        const success = saveLocalPresets(presets);
 
-        populatePresetDropdown();
-        presetSelect.value = '';
+        if (success) {
+            populatePresetDropdown();
+            presetSelect.value = '';
 
-        // Reset disabled states
-        updatePresetBtn.disabled = true;
-        deletePresetBtn.disabled = true;
+            // Reset disabled states
+            updatePresetBtn.disabled = true;
+            deletePresetBtn.disabled = true;
 
-        alert(`Preset "${selected}" deleted.`);
+            alert(`Preset "${selected}" deleted.`);
+        }
     }
 }
 
@@ -1791,15 +2086,21 @@ function handleLoadPreset() {
 }
 
 function loadPresetData(data) {
-    let shouldRegenerateDeck = false;
+    let shouldMergeDeck = false;
+    let shouldOverwriteDeck = false;
 
     if (data.styles) {
         // New save format
         categoryStyles = JSON.parse(JSON.stringify(data.styles));
         backsideMappings = data.mappings ? JSON.parse(JSON.stringify(data.mappings)) : {};
         if (data.deck && data.deck.length > 0) {
-            parsedCsvData = JSON.parse(JSON.stringify(data.deck));
-            shouldRegenerateDeck = true;
+            if (parsedCsvData && parsedCsvData.length > 0) {
+                if (confirm("This preset contains its own saved cards (including your manual duplicates).\n\nPress OK to load these saved cards AND automatically append any brand new cards from your current CSV.\nPress Cancel to KEEP your current CSV sequence completely and just apply the layout styles.")) {
+                    shouldMergeDeck = true;
+                }
+            } else {
+                shouldOverwriteDeck = true;
+            }
         }
     } else {
         // Legacy save format (backwards compatibility)
@@ -1807,17 +2108,54 @@ function loadPresetData(data) {
         backsideMappings = {};
     }
 
-    if (shouldRegenerateDeck) {
-        // Re-generate the entire grid from the saved state, which automatically invokes applyStoredStyles
+    if (shouldMergeDeck && data.deck) {
+        const oldDeck = JSON.parse(JSON.stringify(data.deck));
+
+        // Build a lookup of the freshly parsed CSV data by Card_Title
+        // We assume the user just loaded a new CSV with cool new text
+        const freshCsvDict = {};
+        if (parsedCsvData) {
+            parsedCsvData.forEach(row => {
+                freshCsvDict[row.Card_Title] = row;
+            });
+        }
+
+        const mergedDeck = [];
+        const oldTitles = new Set();
+
+        // 1. Iterate through the old structural deck (which holds manual duplicates!)
+        oldDeck.forEach(oldRow => {
+            oldTitles.add(oldRow.Card_Title);
+            const freshData = freshCsvDict[oldRow.Card_Title];
+
+            if (freshData) {
+                // Merge: Keep the old structural properties (Qty) but overwrite with the fresh textual data
+                // This means the user's manual duplicates are preserved, but they get the updated text!
+                const mergedRow = { ...freshData, Qty: oldRow.Qty };
+                mergedDeck.push(mergedRow);
+            } else {
+                // If the card no longer exists in the CSV, just keep the old one entirely so we don't break the layout
+                mergedDeck.push(oldRow);
+            }
+        });
+
+        // 2. Append brand new cards from the CSV that were NOT in the old deck
+        let brandNewCards = [];
+        if (parsedCsvData) {
+            brandNewCards = parsedCsvData.filter(row => !oldTitles.has(row.Card_Title));
+        }
+
+        parsedCsvData = [...mergedDeck, ...brandNewCards];
+    } else if (shouldOverwriteDeck && data.deck) {
+        parsedCsvData = JSON.parse(JSON.stringify(data.deck));
+    }
+
+    if (parsedCsvData && parsedCsvData.length > 0) {
+        // ALWAYS re-generate the grid to reliably rebuild `cardTitles` and `updateCategoryDropdown()`
+        // This ensures whether we kept the CSV or overwrote it, the DOM perfectly matches `categoryStyles` 
+        // and we don't end up with un-targetable "single view" cards.
         generateCards();
         document.getElementById('generateBtn').disabled = false;
-    } else {
-        // Re-apply all styles gracefully without wiping grid
-        const cards = document.querySelectorAll('.game-card');
-        cards.forEach(card => {
-            applyStoredStyles(card, card.dataset.category, card.dataset.sysId);
-        });
-        updateControlsToMatchCategory();
     }
 }
 
@@ -1858,7 +2196,7 @@ async function handleExportPreset() {
 
     try {
         const exportData = {
-            styles: JSON.parse(JSON.stringify(categoryStyles)),
+            styles: resolveStylesForExport(),
             mappings: JSON.parse(JSON.stringify(backsideMappings)),
             deck: JSON.parse(JSON.stringify(parsedCsvData))
         };
@@ -1880,15 +2218,51 @@ async function handleExportPreset() {
                     if (base64) style.fgImageBase64 = base64;
                 }
             }
+            if (style.customTexts) {
+                for (const txt of style.customTexts) {
+                    if (txt.bg && txt.bg.includes('/uploads/')) {
+                        const urlMatch = txt.bg.match(/url\(['"]?([^'"]+)['"]?\)/);
+                        if (urlMatch && urlMatch[1]) {
+                            const base64 = await urlToBase64(urlMatch[1]);
+                            if (base64) txt.bgBase64 = base64;
+                        }
+                    }
+                }
+            }
         }
 
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", "deckmaker_preset.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        const jsonString = JSON.stringify(exportData, null, 2);
+
+        if (window.showSaveFilePicker) {
+            try {
+                // Use modern File System Access API to explicitly prompt for a save location
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: 'deckmaker_preset.json',
+                    types: [{
+                        description: 'JSON Data',
+                        accept: { 'application/json': ['.json'] },
+                    }],
+                });
+                const writable = await fileHandle.createWritable();
+                await writable.write(jsonString);
+                await writable.close();
+            } catch (err) {
+                // Usually an AbortError if the user simply closed the dialog without saving
+                if (err.name !== 'AbortError') {
+                    console.error("Save file picker failed:", err);
+                    alert("Failed to save via file picker.");
+                }
+            }
+        } else {
+            // Fallback for browsers that don't support showSaveFilePicker (Firefox occasionally, or non-secure contexts)
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonString);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "deckmaker_preset.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
     } catch (err) {
         console.error("Export failed:", err);
         alert("Failed to export preset.");
@@ -1907,105 +2281,181 @@ async function handleImportPreset(event) {
     reader.onload = async function (e) {
         try {
             const importedData = JSON.parse(e.target.result);
+            const stylesToProcess = importedData.styles ? importedData.styles : importedData;
 
-            // Show a loading indicator since uploading takes time
+            // ── STEP 1: Make ALL user decisions SYNCHRONOUSLY before any await ──
+            // (browsers suppress alert/confirm after async context is lost)
+
+            // Decide how to handle the saved deck structure
+            let shouldMergeDeck = false;
+            let shouldOverwriteDeck = false;
+
+            if (importedData.deck && importedData.deck.length > 0) {
+                if (parsedCsvData && parsedCsvData.length > 0) {
+                    shouldMergeDeck = confirm(
+                        "This preset contains saved cards (including duplicates and blank cards).\n\n" +
+                        "OK  → Load the preset's saved cards and merge with your current CSV\n" +
+                        "Cancel → Keep your current card list and only apply the styles"
+                    );
+                } else {
+                    shouldOverwriteDeck = true;
+                }
+            }
+
+            // Decide if user wants to save to local presets
+            let saveToLocal = false;
+            let localPresetName = null;
+            saveToLocal = confirm("Also save this preset to your local browser presets for quick access?");
+            if (saveToLocal) {
+                localPresetName = prompt("Enter a name for this preset:");
+                if (!localPresetName || localPresetName.trim() === '') saveToLocal = false;
+            }
+
+            // ── STEP 2: Now do the async image uploads ──
             document.body.style.cursor = 'wait';
 
-            // Scan for base64 images and upload them back to the server
             const uploadPromises = [];
-            const urlMapping = {}; // Map old URLs to new URLs
-
-            // Determine if new format or old format
-            const stylesToProcess = importedData.styles ? importedData.styles : importedData;
+            const urlMapping = {};
 
             for (const targetKey in stylesToProcess) {
                 const style = stylesToProcess[targetKey];
 
                 if (style.bgImageBase64) {
-                    const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    if (!urlMapping[oldUrl]) {
+                    const oldUrl = style.bgImage ? style.bgImage.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                    if (oldUrl && !urlMapping[oldUrl]) {
                         const blob = base64ToBlob(style.bgImageBase64);
                         const ext = blob.type.split('/')[1] || 'png';
                         const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
-
                         const formData = new FormData();
                         formData.append('image', fileObj);
-
-                        const uploadPromise = fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData
-                        }).then(res => res.json()).then(data => {
-                            if (data.url) urlMapping[oldUrl] = data.url;
-                        });
-
-                        uploadPromises.push(uploadPromise);
+                        uploadPromises.push(
+                            fetch('/api/upload', { method: 'POST', body: formData })
+                                .then(res => res.json())
+                                .then(data => { if (data.url) urlMapping[oldUrl] = data.url; })
+                        );
                     }
                 }
 
                 if (style.fgImageBase64) {
-                    const oldUrl = style.fgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    if (!urlMapping[oldUrl]) {
+                    const oldUrl = style.fgImage ? style.fgImage.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                    if (oldUrl && !urlMapping[oldUrl]) {
                         const blob = base64ToBlob(style.fgImageBase64);
                         const ext = blob.type.split('/')[1] || 'png';
                         const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
-
                         const formData = new FormData();
                         formData.append('image', fileObj);
+                        uploadPromises.push(
+                            fetch('/api/upload', { method: 'POST', body: formData })
+                                .then(res => res.json())
+                                .then(data => { if (data.url) urlMapping[oldUrl] = data.url; })
+                        );
+                    }
+                }
 
-                        const uploadPromise = fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData
-                        }).then(res => res.json()).then(data => {
-                            if (data.url) urlMapping[oldUrl] = data.url;
-                        });
-
-                        uploadPromises.push(uploadPromise);
+                if (style.customTexts) {
+                    for (const txt of style.customTexts) {
+                        if (txt.bgBase64) {
+                            const oldUrl = txt.bg ? txt.bg.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                            if (oldUrl && !urlMapping[oldUrl]) {
+                                const blob = base64ToBlob(txt.bgBase64);
+                                const ext = blob.type.split('/')[1] || 'png';
+                                const fileObj = new File([blob], `imported_${Date.now()}.${ext}`, { type: blob.type });
+                                const formData = new FormData();
+                                formData.append('image', fileObj);
+                                uploadPromises.push(
+                                    fetch('/api/upload', { method: 'POST', body: formData })
+                                        .then(res => res.json())
+                                        .then(data => { if (data.url) urlMapping[oldUrl] = data.url; })
+                                );
+                            }
+                        }
                     }
                 }
             }
 
-            // Wait for all image uploads to finish
             if (uploadPromises.length > 0) {
                 await Promise.all(uploadPromises);
             }
 
-            // Update the imported data with the newly generated URLs
+            // ── STEP 3: Rewrite image URLs with newly uploaded versions ──
             for (const targetKey in stylesToProcess) {
                 const style = stylesToProcess[targetKey];
 
                 if (style.bgImageBase64) {
-                    const oldUrl = style.bgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    if (urlMapping[oldUrl]) {
-                        style.bgImage = `url("${urlMapping[oldUrl]}")`;
-                    }
+                    const oldUrl = style.bgImage ? style.bgImage.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                    if (urlMapping[oldUrl]) style.bgImage = `url("${urlMapping[oldUrl]}")`;
                     delete style.bgImageBase64;
                 }
 
                 if (style.fgImageBase64) {
-                    const oldUrl = style.fgImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    if (urlMapping[oldUrl]) {
-                        style.fgImage = `url('${urlMapping[oldUrl]}')`; // Keep single quotes matching original standard 
-                    }
+                    const oldUrl = style.fgImage ? style.fgImage.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                    if (urlMapping[oldUrl]) style.fgImage = `url("${urlMapping[oldUrl]}")`;
                     delete style.fgImageBase64;
+                }
+
+                if (style.customTexts) {
+                    for (const txt of style.customTexts) {
+                        if (txt.bgBase64) {
+                            const oldUrl = txt.bg ? txt.bg.replace(/^url\(['"']?/, '').replace(/['"']?\)$/, '') : '';
+                            if (urlMapping[oldUrl]) txt.bg = `url("${urlMapping[oldUrl]}")`;
+                            delete txt.bgBase64;
+                        }
+                    }
                 }
             }
 
-            loadPresetData(importedData);
+            // Log any images that couldn't be restored (stale /uploads/ URLs with no base64)
+            const missingImages = [];
+            for (const targetKey in stylesToProcess) {
+                const style = stylesToProcess[targetKey];
+                if (style.bgImage && style.bgImage.includes('/uploads/')) missingImages.push(`${targetKey}: bgImage`);
+                if (style.fgImage && style.fgImage.includes('/uploads/')) missingImages.push(`${targetKey}: fgImage`);
+            }
+            if (missingImages.length > 0) {
+                console.warn('Import: stale /uploads/ URLs (no base64 embedded, re-export needed):', missingImages);
+            }
 
-            if (confirm("Preset imported successfully! Do you want to save this to your local browser presets?")) {
-                const name = prompt("Enter a name for this preset:");
-                if (name && name.trim() !== '') {
-                    const presets = getLocalPresets();
-                    presets[name.trim()] = {
-                        styles: JSON.parse(JSON.stringify(stylesToProcess)),
-                        mappings: importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {}
-                    };
-                    saveLocalPresets(presets);
-                    populatePresetDropdown();
-                    presetSelect.value = name.trim();
-                    updatePresetBtn.disabled = false;
-                    deletePresetBtn.disabled = false;
+            // ── STEP 4: Apply everything ──
+            // Manually apply the deck decision (loadPresetData will handle the rest)
+            if (shouldMergeDeck && importedData.deck) {
+                const freshCsvDict = {};
+                if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[row.Card_Title] = row; });
+
+                const mergedDeck = [];
+                const oldTitles = new Set();
+                importedData.deck.forEach(oldRow => {
+                    oldTitles.add(oldRow.Card_Title);
+                    const freshData = freshCsvDict[oldRow.Card_Title];
+                    mergedDeck.push(freshData ? { ...freshData, Qty: oldRow.Qty } : oldRow);
+                });
+
+                // Append brand-new CSV cards not in the saved deck
+                if (parsedCsvData) {
+                    parsedCsvData.filter(row => !oldTitles.has(row.Card_Title)).forEach(row => mergedDeck.push(row));
                 }
+
+                parsedCsvData = mergedDeck;
+                // Remove deck from importedData so loadPresetData doesn't re-ask
+                const importedDataForLoad = { ...importedData, deck: null };
+                categoryStyles = JSON.parse(JSON.stringify(stylesToProcess));
+                backsideMappings = importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {};
+                generateCards();
+            } else {
+                loadPresetData(importedData);
+            }
+
+            // ── STEP 5: Save to local presets if user chose to ──
+            if (saveToLocal && localPresetName) {
+                const presets = getLocalPresets();
+                presets[localPresetName.trim()] = {
+                    styles: JSON.parse(JSON.stringify(stylesToProcess)),
+                    mappings: importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {},
+                    deck: importedData.deck ? JSON.parse(JSON.stringify(importedData.deck)) : (parsedCsvData ? JSON.parse(JSON.stringify(parsedCsvData)) : [])
+                };
+                saveLocalPresets(presets);
+                populatePresetDropdown();
+                presetSelect.value = localPresetName.trim();
+                deletePresetBtn.disabled = false;
             }
 
         } catch (err) {
@@ -2018,6 +2468,7 @@ async function handleImportPreset(event) {
     };
     reader.readAsText(file);
 }
+
 
 /**
  * --- Backside Mapping & Print Layout Logic ---
@@ -2185,3 +2636,28 @@ function generatePrintLayout() {
     window.print();
 }
 
+// --- Auto-Restore Check on Boot ---
+document.addEventListener('DOMContentLoaded', () => {
+    populatePresetDropdown();
+
+    const savedState = localStorage.getItem(AUTOSAVE_KEY);
+    if (savedState) {
+        try {
+            const parsed = JSON.parse(savedState);
+            if (parsed.deck && parsed.deck.length > 0) {
+                // Restore previous working session
+                parsedCsvData = parsed.deck;
+                categoryStyles = parsed.styles || categoryStyles;
+                backsideMappings = parsed.mappings || backsideMappings;
+
+                // Sync UI
+                document.getElementById('fileStatus').textContent = "Restored previous working session.";
+                document.getElementById('generateBtn').disabled = false;
+
+                generateCards(); // Boot the board
+            }
+        } catch (e) {
+            console.error("Failed to restore autosave:", e);
+        }
+    }
+});
