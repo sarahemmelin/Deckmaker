@@ -1534,6 +1534,37 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
         newX = Math.max(0, Math.min(100, newX));
         newY = Math.max(0, Math.min(100, newY));
 
+        // Design guides — lazily inject once per card, then show/snap near center
+        const SNAP_THRESHOLD = 2.5;
+        const SHOW_THRESHOLD = 5;
+
+        let guideH = cardDiv.querySelector('.design-guide-h');
+        let guideV = cardDiv.querySelector('.design-guide-v');
+        if (!guideH) {
+            guideH = document.createElement('div');
+            guideH.className = 'design-guide design-guide-h';
+            cardDiv.appendChild(guideH);
+        }
+        if (!guideV) {
+            guideV = document.createElement('div');
+            guideV.className = 'design-guide design-guide-v';
+            cardDiv.appendChild(guideV);
+        }
+
+        if (Math.abs(newY - 50) <= SNAP_THRESHOLD) {
+            newY = 50;
+            guideH.classList.add('is-visible');
+        } else {
+            guideH.classList.toggle('is-visible', Math.abs(newY - 50) <= SHOW_THRESHOLD);
+        }
+
+        if (Math.abs(newX - 50) <= SNAP_THRESHOLD) {
+            newX = 50;
+            guideV.classList.add('is-visible');
+        } else {
+            guideV.classList.toggle('is-visible', Math.abs(newX - 50) <= SHOW_THRESHOLD);
+        }
+
         wrapper.style.left = newX + '%';
         wrapper.style.top = newY + '%';
 
@@ -1543,6 +1574,9 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
     document.addEventListener('mouseup', (e) => {
         if (!isDragging) return;
         isDragging = false;
+
+        // Hide design guides
+        cardDiv.querySelectorAll('.design-guide').forEach(g => g.classList.remove('is-visible'));
 
         const newX = parseFloat(wrapper.style.left);
         const newY = parseFloat(wrapper.style.top);

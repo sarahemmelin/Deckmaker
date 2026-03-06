@@ -741,6 +741,37 @@ button:disabled {
     transform: scale(1.1);
 }
 
+/* Design Guides — center alignment helpers during custom text drag */
+.design-guide {
+    position: absolute;
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.design-guide.is-visible {
+    opacity: 1;
+}
+
+.design-guide-h {
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(59, 130, 246, 0.75);
+    transform: translateY(-0.5px);
+}
+
+.design-guide-v {
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(59, 130, 246, 0.75);
+    transform: translateX(-0.5px);
+}
+
 /* Floating Toolbar for Custom Texts */
 .floating-toolbar {
     position: absolute;
