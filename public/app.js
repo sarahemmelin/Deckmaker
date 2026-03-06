@@ -2450,8 +2450,13 @@ async function handleImportPreset(event) {
             }
 
             // ── STEP 4: Apply everything ──
-            // Manually apply the deck decision (loadPresetData will handle the rest)
+            // Always apply styles and mappings from the import.
+            categoryStyles = JSON.parse(JSON.stringify(stylesToProcess));
+            backsideMappings = importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {};
+
             if (shouldMergeDeck && importedData.deck) {
+                // Merge: preserve preset's deck structure (duplicates, blank cards) while
+                // pulling fresh text/data from the current CSV for matching titles.
                 const freshCsvDict = {};
                 if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[row.Card_Title] = row; });
 
@@ -2460,22 +2465,27 @@ async function handleImportPreset(event) {
                 importedData.deck.forEach(oldRow => {
                     oldTitles.add(oldRow.Card_Title);
                     const freshData = freshCsvDict[oldRow.Card_Title];
+                    // Blank cards and cards not in current CSV fall back to the saved row as-is
                     mergedDeck.push(freshData ? { ...freshData, Qty: oldRow.Qty } : oldRow);
                 });
 
-                // Append brand-new CSV cards not in the saved deck
+                // Append brand-new CSV cards not present in the saved deck
                 if (parsedCsvData) {
                     parsedCsvData.filter(row => !oldTitles.has(row.Card_Title)).forEach(row => mergedDeck.push(row));
                 }
 
                 parsedCsvData = mergedDeck;
-                // Remove deck from importedData so loadPresetData doesn't re-ask
-                const importedDataForLoad = { ...importedData, deck: null };
-                categoryStyles = JSON.parse(JSON.stringify(stylesToProcess));
-                backsideMappings = importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {};
+            } else if (shouldOverwriteDeck && importedData.deck) {
+                // No current CSV — restore the preset's deck exactly as saved
+                // (includes duplicates and blank cards)
+                parsedCsvData = JSON.parse(JSON.stringify(importedData.deck));
+            }
+            // If neither (user cancelled) — parsedCsvData is unchanged; only styles were applied.
+
+            if (parsedCsvData && parsedCsvData.length > 0) {
                 generateCards();
-            } else {
-                loadPresetData(importedData);
+                document.getElementById('generateBtn').disabled = false;
+                printBtn.disabled = false;
             }
 
             // ── STEP 5: Save to local presets if user chose to ──
