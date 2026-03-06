@@ -45,6 +45,9 @@ const accentColorText = document.getElementById('accentColorText');
 const fontFamilySelect = document.getElementById('fontFamilySelect');
 const fontSizeSlider = document.getElementById('fontSizeSlider');
 const wordBreakToggle = document.getElementById('wordBreakToggle');
+const mechanicBgColorPicker = document.getElementById('mechanicBgColorPicker');
+const mechanicBgColorText = document.getElementById('mechanicBgColorText');
+const mechanicBgOpacitySlider = document.getElementById('mechanicBgOpacitySlider');
 const showBuoyancyToggle = document.getElementById('showBuoyancyToggle');
 const addCustomTextBtn = document.getElementById('addCustomTextBtn');
 const backToAllBtn = document.getElementById('backToAllBtn');
@@ -106,7 +109,11 @@ let categoryStyles = {
         font: "'Inter', sans-serif",
         size: "1",
         wordBreak: false,
+        hideIllustration: false,
+        mechanicBgColor: "#000000",
+        mechanicBgOpacity: "0.04",
         showBuoy: true,
+        textGap: "0.06",
         // Buoyancy defaults
         buoyVisible: true,
         buoyIcon: "arrow_downward",
@@ -143,6 +150,10 @@ const simpleBindings = [
     { el: fontSizeSlider, prop: 'size' },
     { el: showBuoyancyToggle, prop: 'showBuoy', type: 'checkbox' },
     { el: wordBreakToggle, prop: 'wordBreak', type: 'checkbox' },
+    { el: document.getElementById('hideIllustrationToggle'), prop: 'hideIllustration', type: 'checkbox' },
+    { el: mechanicBgColorPicker, textEl: mechanicBgColorText, prop: 'mechanicBgColor' },
+    { el: mechanicBgOpacitySlider, prop: 'mechanicBgOpacity' },
+    { el: document.getElementById('textGapSlider'), prop: 'textGap' },
 
     // New Stat Bindings
     { el: statBuoyVisible, prop: 'buoyVisible', type: 'checkbox' },
@@ -353,6 +364,7 @@ syncColorInput(bgColorPicker, bgColorText, 'bg');
 syncColorInput(overlayColorPicker, overlayColorText, 'overlayColor');
 syncColorInput(textColorPicker, textColorText, 'text');
 syncColorInput(accentColorPicker, accentColorText, 'accent');
+syncColorInput(mechanicBgColorPicker, mechanicBgColorText, 'mechanicBgColor');
 
 // Attach sync logic for stat color inputs
 syncColorInput(statBuoyColor, document.getElementById('statBuoyColorText'), 'buoyColor');
@@ -370,10 +382,18 @@ removeBgImageBtn.addEventListener('click', () => {
 function updateSliderBackground(slider) {
     if (!slider) return;
     const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
-    slider.style.background = `linear-gradient(to right, var(--accent-light) 0%, var(--accent-color) ${value}%, var(--border-color) ${value}%, var(--border-color) 100%)`;
+    slider.style.background = `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${value}%, #cbd5e1 ${value}%, #cbd5e1 100%)`;
+    const display = slider.parentNode?.querySelector('.slider-value');
+    if (display) display.textContent = parseFloat(slider.value).toFixed(2).replace(/\.?0+$/, '') || '0';
 }
 
 function bindSlider(slider, propertyName) {
+    // Inject value display span if not already present
+    if (!slider.parentNode.querySelector('.slider-value')) {
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'slider-value';
+        slider.insertAdjacentElement('afterend', valueSpan);
+    }
     // Initial paint
     updateSliderBackground(slider);
 
@@ -395,6 +415,8 @@ bindSlider(fgPosXSlider, 'fgPosX');
 bindSlider(fgPosYSlider, 'fgPosY');
 bindSlider(overlayOpacitySlider, 'overlayOpacity');
 bindSlider(fontSizeSlider, 'size');
+bindSlider(mechanicBgOpacitySlider, 'mechanicBgOpacity');
+bindSlider(document.getElementById('textGapSlider'), 'textGap');
 
 // Bind stat sliders
 bindSlider(statBuoySize, 'buoySize');
@@ -417,6 +439,7 @@ clearOverlayBtn.addEventListener('click', () => {
 fontFamilySelect.addEventListener('change', () => { saveStateToHistory(); applyStyle('font', fontFamilySelect.value); });
 fontSizeSlider.addEventListener('input', () => applyStyle('size', fontSizeSlider.value));
 wordBreakToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('wordBreak', wordBreakToggle.checked); });
+document.getElementById('hideIllustrationToggle').addEventListener('change', (e) => { saveStateToHistory(); applyStyle('hideIllustration', e.target.checked); });
 showBuoyancyToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('showBuoy', showBuoyancyToggle.checked); });
 addCustomTextBtn.addEventListener('click', handleAddCustomText);
 
@@ -661,11 +684,11 @@ function generateCards() {
                     <div class="card-image-placeholder">Click to add illustration</div>
                     
                     <div class="card-body">
-                        ${rowData.Standard_Text ? `<div class="card-standard-text">${escapeHTML(rowData.Standard_Text)}</div>` : ''}
+                        ${rowData.Standard_Text ? `<div class="card-standard-text">${parseCardText(rowData.Standard_Text)}</div>` : ''}
                         ${pointsHTML}
-                        ${rowData.Red_Filter_Text ? `<div class="card-red-text">${escapeHTML(rowData.Red_Filter_Text)}</div>` : ''}
-                        ${rowData.Mechanic_Action ? `<div class="card-mechanic">${escapeHTML(rowData.Mechanic_Action)}</div>` : ''}
-                        ${rowData.Flavor_Text ? `<div class="card-flavor">${escapeHTML(rowData.Flavor_Text).replace(/\n/g, '<br>')}</div>` : ''}
+                        ${rowData.Red_Filter_Text ? `<div class="card-red-text">${parseCardText(rowData.Red_Filter_Text)}</div>` : ''}
+                        ${rowData.Mechanic_Action ? `<div class="card-mechanic">${parseCardText(rowData.Mechanic_Action)}</div>` : ''}
+                        ${rowData.Flavor_Text ? `<div class="card-flavor">${parseCardText(rowData.Flavor_Text)}</div>` : ''}
                     </div>
                     ${rowData.Card_ID ? `<div class="card-id-footer">${escapeHTML(rowData.Card_ID)}</div>` : ''}
                 `;
@@ -1117,7 +1140,13 @@ function updateControlsToMatchCategory() {
         if (fontFamilySelect) fontFamilySelect.value = styles.font;
         if (fontSizeSlider) fontSizeSlider.value = styles.size;
         if (wordBreakToggle) wordBreakToggle.checked = styles.wordBreak;
+        const hideIllustrationToggleEl = document.getElementById('hideIllustrationToggle');
+        if (hideIllustrationToggleEl) hideIllustrationToggleEl.checked = styles.hideIllustration !== undefined ? styles.hideIllustration : false;
         if (showBuoyancyToggle) showBuoyancyToggle.checked = (styles.showBuoy !== undefined) ? styles.showBuoy : true;
+        const textGapSliderEl = document.getElementById('textGapSlider');
+        if (textGapSliderEl) { textGapSliderEl.value = styles.textGap !== undefined ? styles.textGap : "0.06"; updateSliderBackground(textGapSliderEl); }
+        if (mechanicBgColorPicker) { const c = styles.mechanicBgColor || '#000000'; mechanicBgColorPicker.value = c; if (mechanicBgColorText) mechanicBgColorText.value = c; }
+        if (mechanicBgOpacitySlider) { mechanicBgOpacitySlider.value = styles.mechanicBgOpacity !== undefined ? styles.mechanicBgOpacity : '0.04'; updateSliderBackground(mechanicBgOpacitySlider); }
 
         // Stat Icons
         if (statBuoyVisible) statBuoyVisible.checked = (styles.buoyVisible !== undefined) ? styles.buoyVisible : true;
@@ -1151,6 +1180,7 @@ function updateControlsToMatchCategory() {
         updateSliderBackground(statBuoySize);
         updateSliderBackground(statMinSize);
         updateSliderBackground(statBioSize);
+        updateSliderBackground(document.getElementById('textGapSlider'));
     }
 
     // 2. Filter the UI Grid to ONLY show the targeted cards
@@ -1293,8 +1323,26 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
         cardDiv.style.setProperty('--dynamic-card-break', breakType);
         cardDiv.style.setProperty('--dynamic-card-hyphens', hyphenType);
     }
+    if (propName === 'hideIllustration') {
+        cardDiv.classList.toggle('hide-illustration-manual', !!value);
+    }
     if (propName === 'showBuoy') {
         cardDiv.style.setProperty('--dynamic-card-buoy-display', value ? 'flex' : 'none');
+    }
+    if (propName === 'textGap') {
+        cardDiv.style.setProperty('--card-text-gap', `${value}in`);
+    }
+    if (propName === 'mechanicBgColor') {
+        cardDiv.dataset.mechanicBgColor = value;
+        const opacity = cardDiv.dataset.mechanicBgOpacity ?? '0.04';
+        const rgb = hexToRgb(value);
+        if (rgb) cardDiv.style.setProperty('--card-mechanic-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`);
+    }
+    if (propName === 'mechanicBgOpacity') {
+        cardDiv.dataset.mechanicBgOpacity = value;
+        const hex = cardDiv.dataset.mechanicBgColor ?? '#000000';
+        const rgb = hexToRgb(hex);
+        if (rgb) cardDiv.style.setProperty('--card-mechanic-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${value})`);
     }
 
     // Stat properties
@@ -1394,6 +1442,9 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'font', styles.font !== undefined ? styles.font : "'Inter', sans-serif");
     updateCSSCustomProperty(cardDiv, 'size', styles.size !== undefined ? styles.size : '1');
     updateCSSCustomProperty(cardDiv, 'wordBreak', styles.wordBreak !== undefined ? styles.wordBreak : false);
+    updateCSSCustomProperty(cardDiv, 'hideIllustration', styles.hideIllustration !== undefined ? styles.hideIllustration : false);
+    updateCSSCustomProperty(cardDiv, 'mechanicBgColor', styles.mechanicBgColor !== undefined ? styles.mechanicBgColor : '#000000');
+    updateCSSCustomProperty(cardDiv, 'mechanicBgOpacity', styles.mechanicBgOpacity !== undefined ? styles.mechanicBgOpacity : '0.04');
     updateCSSCustomProperty(cardDiv, 'showBuoy', (styles.showBuoy !== undefined) ? styles.showBuoy : true);
 
     // Handle Custom Texts
@@ -1446,6 +1497,8 @@ function applyStoredStyles(cardDiv, category, title) {
 
         attachCustomTextEvents(wrapper, cardDiv, txt.id, contentSpan, deleteBtn);
     });
+
+    scheduleIllustrationCheck();
 }
 
 function escapeHTML(str) {
@@ -1453,6 +1506,117 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
     }[tag]));
+}
+
+/**
+ * Parses a lightweight markdown-like syntax from CSV text fields into card HTML.
+ *
+ * Per-line tokens:
+ *   ## Heading / ###Heading / ####Heading  → h2 / h3 / h4 (space after # is optional)
+ *   - item  or  * item                     → unordered bullet list
+ *   1. item  or  1) item                   → ordered numbered list
+ *   ---                                    → thin horizontal rule
+ *   [gap:0.1in]                            → explicit spacer of any CSS size
+ *   (blank line)                           → paragraph gap (--card-text-gap)
+ *   anything else                          → plain text span
+ *
+ * Inline tokens (applied within any text):
+ *   **bold**   → <strong>
+ *   *italic*   → <em>  (single asterisk, not adjacent to another *)
+ *
+ * All text is HTML-escaped before inline tokens are applied — no injection risk.
+ */
+
+// Applies **bold** and *italic* to an already-HTML-escaped string.
+function applyInline(escaped) {
+    return escaped
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+}
+
+function parseCardText(str) {
+    if (!str) return '';
+
+    const lines = str.split('\n');
+    const result = [];
+    let listBuffer = [];
+    let listType = null; // 'ul' or 'ol'
+
+    const flushList = () => {
+        if (listBuffer.length > 0) {
+            const tag = listType === 'ol' ? 'ol' : 'ul';
+            result.push(`<${tag} class="card-text-list">${listBuffer.map(i => `<li>${i}</li>`).join('')}</${tag}>`);
+            listBuffer = [];
+            listType = null;
+        }
+    };
+
+    const inline = str => applyInline(escapeHTML(str));
+
+    lines.forEach(rawLine => {
+        const trimmed = rawLine.trim();
+
+        if (trimmed === '') {
+            flushList();
+            result.push('<div class="card-text-gap"></div>');
+        } else if (trimmed === '---') {
+            flushList();
+            result.push('<hr class="card-text-divider">');
+        } else if (/^\[gap:[^\]]+\]$/.test(trimmed)) {
+            flushList();
+            const size = escapeHTML(trimmed.match(/^\[gap:([^\]]+)\]$/)[1]);
+            result.push(`<div class="card-text-gap" style="height:${size}"></div>`);
+        } else if (/^####/.test(trimmed)) {
+            flushList();
+            result.push(`<span class="card-text-h4">${inline(trimmed.replace(/^####\s*/, ''))}</span>`);
+        } else if (/^###/.test(trimmed)) {
+            flushList();
+            result.push(`<span class="card-text-h3">${inline(trimmed.replace(/^###\s*/, ''))}</span>`);
+        } else if (/^##/.test(trimmed)) {
+            flushList();
+            result.push(`<span class="card-text-h2">${inline(trimmed.replace(/^##\s*/, ''))}</span>`);
+        } else if (/^[-*] /.test(trimmed)) {
+            if (listType === 'ol') flushList();
+            listType = 'ul';
+            listBuffer.push(inline(trimmed.slice(2)));
+        } else if (/^\d+[.)]\s/.test(trimmed)) {
+            if (listType === 'ul') flushList();
+            listType = 'ol';
+            listBuffer.push(inline(trimmed.replace(/^\d+[.)]\s/, '')));
+        } else {
+            flushList();
+            result.push(`<span class="card-text-p">${inline(rawLine)}</span>`);
+        }
+    });
+
+    flushList();
+    return result.join('');
+}
+
+// --- Illustration overflow detection ---
+// When a card's body text exceeds the available space (after the fixed-height
+// illustration), we hide the illustration so the body can expand to fill the card.
+
+let _illustrationCheckTimer = null;
+
+function scheduleIllustrationCheck() {
+    clearTimeout(_illustrationCheckTimer);
+    _illustrationCheckTimer = setTimeout(() => {
+        document.querySelectorAll('.game-card').forEach(checkIllustrationOverflow);
+    }, 60);
+}
+
+function checkIllustrationOverflow(cardDiv) {
+    const body = cardDiv.querySelector('.card-body');
+    if (!body) return; // blank / backside cards have no body
+
+    // Reset first so we measure with the illustration present
+    cardDiv.classList.remove('no-illustration');
+
+    // If body content is taller than its container, the illustration is crowding it out
+    if (body.scrollHeight > body.clientHeight + 1) {
+        cardDiv.classList.add('no-illustration');
+    }
 }
 
 function handleAddCustomText() {
@@ -2450,8 +2614,13 @@ async function handleImportPreset(event) {
             }
 
             // ── STEP 4: Apply everything ──
-            // Manually apply the deck decision (loadPresetData will handle the rest)
+            // Always apply styles and mappings from the import.
+            categoryStyles = JSON.parse(JSON.stringify(stylesToProcess));
+            backsideMappings = importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {};
+
             if (shouldMergeDeck && importedData.deck) {
+                // Merge: preserve preset's deck structure (duplicates, blank cards) while
+                // pulling fresh text/data from the current CSV for matching titles.
                 const freshCsvDict = {};
                 if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[row.Card_Title] = row; });
 
@@ -2460,22 +2629,27 @@ async function handleImportPreset(event) {
                 importedData.deck.forEach(oldRow => {
                     oldTitles.add(oldRow.Card_Title);
                     const freshData = freshCsvDict[oldRow.Card_Title];
+                    // Blank cards and cards not in current CSV fall back to the saved row as-is
                     mergedDeck.push(freshData ? { ...freshData, Qty: oldRow.Qty } : oldRow);
                 });
 
-                // Append brand-new CSV cards not in the saved deck
+                // Append brand-new CSV cards not present in the saved deck
                 if (parsedCsvData) {
                     parsedCsvData.filter(row => !oldTitles.has(row.Card_Title)).forEach(row => mergedDeck.push(row));
                 }
 
                 parsedCsvData = mergedDeck;
-                // Remove deck from importedData so loadPresetData doesn't re-ask
-                const importedDataForLoad = { ...importedData, deck: null };
-                categoryStyles = JSON.parse(JSON.stringify(stylesToProcess));
-                backsideMappings = importedData.mappings ? JSON.parse(JSON.stringify(importedData.mappings)) : {};
+            } else if (shouldOverwriteDeck && importedData.deck) {
+                // No current CSV — restore the preset's deck exactly as saved
+                // (includes duplicates and blank cards)
+                parsedCsvData = JSON.parse(JSON.stringify(importedData.deck));
+            }
+            // If neither (user cancelled) — parsedCsvData is unchanged; only styles were applied.
+
+            if (parsedCsvData && parsedCsvData.length > 0) {
                 generateCards();
-            } else {
-                loadPresetData(importedData);
+                document.getElementById('generateBtn').disabled = false;
+                printBtn.disabled = false;
             }
 
             // ── STEP 5: Save to local presets if user chose to ──

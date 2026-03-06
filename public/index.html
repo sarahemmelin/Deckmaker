@@ -310,6 +310,33 @@
                             <label for="wordBreakToggle">Force Word Break:</label>
                             <input type="checkbox" id="wordBreakToggle">
                         </div>
+
+                        <div class="style-field">
+                            <label for="hideIllustrationToggle">Hide Illustration:</label>
+                            <input type="checkbox" id="hideIllustrationToggle">
+                        </div>
+
+                        <div class="style-field" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="textGapSlider">Paragraph Gap (in):</label>
+                            <input type="range" id="textGapSlider" min="0" max="0.25" step="0.01" value="0.06" style="width: 100%;">
+                        </div>
+
+                        <div class="style-field">
+                            <label for="mechanicBgColorPicker">Mechanic Box Color:</label>
+                            <div class="lightning-color-picker">
+                                <label class="color-swatch-wrapper">
+                                    <input type="color" id="mechanicBgColorPicker" value="#000000">
+                                    <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                </label>
+                                <input type="text" id="mechanicBgColorText" class="color-text-input" value="#000000"
+                                    autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="style-field" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                            <label for="mechanicBgOpacitySlider">Mechanic Box Opacity:</label>
+                            <input type="range" id="mechanicBgOpacitySlider" min="0" max="1" step="0.01" value="0.04" style="width: 100%;">
+                        </div>
                     </div>
                 </details>
 
