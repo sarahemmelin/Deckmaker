@@ -367,13 +367,39 @@
                                     style="width: 100%;">
                             </div>
                             <div class="style-field">
-                                <label for="statBuoyColor">Color:</label>
+                                <label for="statBuoyColor">Icon Color:</label>
                                 <div class="lightning-color-picker">
                                     <label class="color-swatch-wrapper">
                                         <input type="color" id="statBuoyColor" value="#ffffff">
                                         <span class="material-icons dropdown-icon">arrow_drop_down</span>
                                     </label>
                                 </div>
+                            </div>
+                            <div class="style-field">
+                                <label for="statBuoyBgPicker">Badge Color:</label>
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <div class="lightning-color-picker" style="flex: 1;">
+                                        <label class="color-swatch-wrapper" style="width: 100%;">
+                                            <input type="color" id="statBuoyBgPicker" value="#1f2937">
+                                            <span class="material-icons dropdown-icon">arrow_drop_down</span>
+                                        </label>
+                                    </div>
+                                    <button id="statBuoyBgResetBtn"
+                                        style="padding: 0.25rem; width: 28px; height: 38px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #64748b; color: white;"
+                                        title="Reset to Accent Color">
+                                        <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="style-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                <label for="statBuoyBgOpacity">Badge Opacity:</label>
+                                <input type="range" id="statBuoyBgOpacity" min="0" max="1" step="0.05" value="1"
+                                    style="width: 100%;">
+                            </div>
+                            <div class="style-field">
+                                <label for="statBuoyRadiusInput">Badge Radius (px):</label>
+                                <input type="number" id="statBuoyRadiusInput" step="1" min="0" max="50" value="2"
+                                    style="width: 80px; padding: 0.25rem;">
                             </div>
                         </div>
 
@@ -453,41 +479,65 @@
                                 Text Element
                             </button>
                         </div>
+
+                        <div class="style-field" style="flex-direction: column; align-items: flex-start; gap: 0.4rem;">
+                            <label>Add Icon Element:</label>
+                            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                <button class="icon-add-btn secondary-btn" data-icon="diamond" title="Diamond"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                    <span class="material-icons" style="font-size: 1rem; vertical-align: middle;">diamond</span>
+                                </button>
+                                <button class="icon-add-btn secondary-btn" data-icon="eco" title="Leaf"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                    <span class="material-icons" style="font-size: 1rem; vertical-align: middle;">eco</span>
+                                </button>
+                                <button class="icon-add-btn secondary-btn" data-icon="arrow_downward" title="Arrow Down"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                    <span class="material-icons" style="font-size: 1rem; vertical-align: middle;">arrow_downward</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <p
                             style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; text-align: center;">
-                            Double-click to edit, drag to move. Delete all text to remove.</p>
+                            Double-click to edit text, drag to move. Delete all text to remove.</p>
 
                         <!-- Toolbar for Active Custom Text -->
                         <div id="customTextToolbar" class="ctx-sidebar-editor">
                             <hr class="sidebar-divider" style="margin: 0.5rem 0;" />
                             <h4
                                 style="font-size: 0.75rem; color: var(--accent-color); margin-bottom: 0.5rem; text-align: center;">
-                                Text Properties (Click a text element to edit)</h4>
-                            <div class="style-field">
-                                <label for="ctxFontSelect">Font:</label>
-                                <select id="ctxFontSelect" class="style-select">
-                                    <option value="inherit">Card Default</option>
-                                    <option value="'Inter', sans-serif">Inter</option>
-                                    <option value="'Roboto', sans-serif">Roboto</option>
-                                    <option value="'Montserrat', sans-serif">Montserrat</option>
-                                    <option value="'Oswald', sans-serif">Oswald</option>
-                                    <option value="'Playfair Display', serif">Playfair Display</option>
-                                    <option value="'Georgia', serif">Georgia</option>
-                                    <option value="'Courier New', monospace">Courier</option>
-                                    <option value="'Impact', sans-serif">Impact</option>
-                                </select>
+                                Element Properties (Click an element to edit)</h4>
+
+                            <!-- Text-only controls -->
+                            <div id="ctxTextOnlyFields">
+                                <div class="style-field">
+                                    <label for="ctxFontSelect">Font:</label>
+                                    <select id="ctxFontSelect" class="style-select">
+                                        <option value="inherit">Card Default</option>
+                                        <option value="'Inter', sans-serif">Inter</option>
+                                        <option value="'Roboto', sans-serif">Roboto</option>
+                                        <option value="'Montserrat', sans-serif">Montserrat</option>
+                                        <option value="'Oswald', sans-serif">Oswald</option>
+                                        <option value="'Playfair Display', serif">Playfair Display</option>
+                                        <option value="'Georgia', serif">Georgia</option>
+                                        <option value="'Courier New', monospace">Courier</option>
+                                        <option value="'Impact', sans-serif">Impact</option>
+                                    </select>
+                                </div>
+                                <div class="style-field">
+                                    <label for="ctxBoldToggle">Bold Text:</label>
+                                    <input type="checkbox" id="ctxBoldToggle">
+                                </div>
                             </div>
+
                             <div class="style-field">
                                 <label for="ctxSizeInput">Size Mult:</label>
                                 <input type="number" id="ctxSizeInput" step="0.1" min="0.5" max="5.0"
                                     style="width: 120px; padding: 0.25rem;" title="Multiplier (e.g. 1.2)">
                             </div>
                             <div class="style-field">
-                                <label for="ctxBoldToggle">Bold Text:</label>
-                                <input type="checkbox" id="ctxBoldToggle">
-                            </div>
-                            <div class="style-field">
-                                <label for="ctxColorPicker">Text Color:</label>
+                                <label for="ctxColorPicker">Color:</label>
                                 <div class="lightning-color-picker" style="width: 120px;">
                                     <label class="color-swatch-wrapper" style="width: 100%;">
                                         <input type="color" id="ctxColorPicker" style="width: 100%;">
@@ -510,6 +560,35 @@
                                         title="Clear Backdrop">
                                         <span class="material-icons" style="font-size: 1rem;">format_color_reset</span>
                                     </button>
+                                </div>
+                            </div>
+                            <div class="style-field" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                                <label for="ctxBgOpacitySlider">Backdrop Opacity:</label>
+                                <input type="range" id="ctxBgOpacitySlider" min="0" max="1" step="0.05" value="1"
+                                    style="width: 100%;">
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxBorderRadiusInput">Corner Radius (px):</label>
+                                <input type="number" id="ctxBorderRadiusInput" step="1" min="0" max="50" value="0"
+                                    style="width: 120px; padding: 0.25rem;">
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxBoxWidthInput">Box Width (px):</label>
+                                <input type="number" id="ctxBoxWidthInput" step="1" min="0" value=""
+                                    style="width: 120px; padding: 0.25rem;" placeholder="auto">
+                            </div>
+                            <div class="style-field">
+                                <label for="ctxBoxHeightInput">Box Height (px):</label>
+                                <input type="number" id="ctxBoxHeightInput" step="1" min="0" value=""
+                                    style="width: 120px; padding: 0.25rem;" placeholder="auto">
+                            </div>
+
+                            <!-- Icon-only controls -->
+                            <div id="ctxIconOnlyFields">
+                                <div class="style-field">
+                                    <label for="ctxStrokeInput">Stroke (px):</label>
+                                    <input type="number" id="ctxStrokeInput" step="0.5" min="0" max="3" value="0"
+                                        style="width: 120px; padding: 0.25rem;" title="Icon outline thickness">
                                 </div>
                             </div>
                         </div>

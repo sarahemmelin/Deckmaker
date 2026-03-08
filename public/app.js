@@ -77,6 +77,10 @@ const statBuoyVisible = document.getElementById('statBuoyVisible');
 const statBuoyIcon = document.getElementById('statBuoyIcon');
 const statBuoySize = document.getElementById('statBuoySize');
 const statBuoyColor = document.getElementById('statBuoyIconColor');
+const statBuoyBgPicker = document.getElementById('statBuoyBgPicker');
+const statBuoyBgOpacity = document.getElementById('statBuoyBgOpacity');
+const statBuoyRadiusInput = document.getElementById('statBuoyRadiusInput');
+const statBuoyBgResetBtn = document.getElementById('statBuoyBgResetBtn');
 
 const statMinVisible = document.getElementById('statMinVisible');
 const statMinIcon = document.getElementById('statMinIcon');
@@ -119,6 +123,9 @@ let categoryStyles = {
         buoyIcon: "arrow_downward",
         buoySize: "1.1",
         buoyColor: "#ffffff",
+        buoyBg: null,       // null = use accent color (CSS fallback)
+        buoyBgOpacity: "1",
+        buoyRadius: "2",
         // Mineral Pts defaults
         minVisible: true,
         minIcon: "diamond",
@@ -183,6 +190,19 @@ let redoStack = [];
 const MAX_HISTORY = 50;
 let copiedStyles = null;
 
+// Multi-select & element clipboard for custom elements
+let selectedCtxIds = new Set();
+let elementClipboard = null; // array of element data objects
+let elementClipboardScope = null; // scope key the elements were copied FROM
+
+// Illustration overflow check timer
+let _illustrationCheckTimer = null;
+
+function clearCtxSelection() {
+    selectedCtxIds.clear();
+    document.querySelectorAll('.custom-text-element.is-selected').forEach(el => el.classList.remove('is-selected'));
+}
+
 // The Auto-Save system ensures that if the user refreshes without explicitly saving a "Preset", their working deck isn't wiped out!
 
 function triggerAutoSave() {
@@ -228,6 +248,51 @@ function reapplyAllStyles() {
 }
 
 document.addEventListener('keydown', (e) => {
+    // Element copy/paste works even when sidebar inputs are focused
+    if (e.ctrlKey && e.key.toLowerCase() === 'c' && selectedCtxIds.size > 0) {
+        e.preventDefault();
+        // Search ALL scopes — the element may live in a different scope than the current target
+        const found = [];
+        elementClipboardScope = null;
+        for (const [key, scope] of Object.entries(categoryStyles)) {
+            if (!scope.customTexts) continue;
+            for (const t of scope.customTexts) {
+                if (selectedCtxIds.has(t.id)) {
+                    found.push(JSON.parse(JSON.stringify(t)));
+                    // Record the most specific scope the copied elements live in
+                    if (!elementClipboardScope || key.startsWith('card_')) elementClipboardScope = key;
+                }
+            }
+        }
+        elementClipboard = found;
+        copiedStyles = null;
+        return;
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'v' && elementClipboard && elementClipboard.length > 0) {
+        e.preventDefault();
+        saveStateToHistory();
+        // Paste into: current target if it's a specific scope, otherwise fall back to the
+        // scope the elements were copied from (avoids cascade-override invisibility on "all")
+        const currentTarget = targetCategory.value;
+        const target = (currentTarget !== 'all') ? currentTarget : (elementClipboardScope || currentTarget);
+        if (!categoryStyles[target]) categoryStyles[target] = {};
+        if (!categoryStyles[target].customTexts) {
+            const effective = getEffectiveStyles(target);
+            categoryStyles[target].customTexts = effective.customTexts
+                ? JSON.parse(JSON.stringify(effective.customTexts))
+                : [];
+        }
+        elementClipboard.forEach(el => {
+            const copy = JSON.parse(JSON.stringify(el));
+            copy.id = 'ctx_' + Date.now() + Math.random().toString(36).substring(2, 9);
+            copy.x = Math.min(95, (copy.x || 50) + 2);
+            copy.y = Math.min(95, (copy.y || 50) + 2);
+            categoryStyles[target].customTexts.push(copy);
+        });
+        reapplyAllStyles();
+        return;
+    }
+
     // Ignore keystrokes if typing inside text fields
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
@@ -244,6 +309,7 @@ document.addEventListener('keydown', (e) => {
         if (target !== 'all' && categoryStyles[target]) {
             e.preventDefault();
             copiedStyles = JSON.parse(JSON.stringify(categoryStyles[target]));
+            elementClipboard = null;
         }
     }
     if (e.ctrlKey && e.key.toLowerCase() === 'v') {
@@ -255,12 +321,15 @@ document.addEventListener('keydown', (e) => {
             // Regenerate IDs
             if (newStyles.customTexts) {
                 newStyles.customTexts.forEach(txt => {
-                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                    txt.id = 'ctx_' + Math.random().toString(36).substring(2, 9) + Date.now();
                 });
             }
             categoryStyles[target] = Object.assign({}, categoryStyles[target], newStyles);
             reapplyAllStyles();
         }
+    }
+    if (e.key === 'Escape') {
+        clearCtxSelection();
     }
 });
 
@@ -420,6 +489,7 @@ bindSlider(document.getElementById('textGapSlider'), 'textGap');
 
 // Bind stat sliders
 bindSlider(statBuoySize, 'buoySize');
+bindSlider(statBuoyBgOpacity, 'buoyBgOpacity');
 bindSlider(statMinSize, 'minSize');
 bindSlider(statBioSize, 'bioSize');
 
@@ -442,10 +512,19 @@ wordBreakToggle.addEventListener('change', () => { saveStateToHistory(); applySt
 document.getElementById('hideIllustrationToggle').addEventListener('change', (e) => { saveStateToHistory(); applyStyle('hideIllustration', e.target.checked); });
 showBuoyancyToggle.addEventListener('change', () => { saveStateToHistory(); applyStyle('showBuoy', showBuoyancyToggle.checked); });
 addCustomTextBtn.addEventListener('click', handleAddCustomText);
+document.querySelectorAll('.icon-add-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleAddCustomIcon(btn.dataset.icon));
+});
 
 // Bind stat icon selectors and checkboxes
 statBuoyVisible.addEventListener('change', () => { saveStateToHistory(); applyStyle('buoyVisible', statBuoyVisible.checked); });
 statBuoyIcon.addEventListener('change', () => { saveStateToHistory(); applyStyle('buoyIcon', statBuoyIcon.value); });
+statBuoyBgPicker.addEventListener('input', () => { applyStyle('buoyBg', statBuoyBgPicker.value); });
+statBuoyBgPicker.addEventListener('change', saveStateToHistory);
+statBuoyBgOpacity.addEventListener('input', () => { applyStyle('buoyBgOpacity', statBuoyBgOpacity.value); updateSliderBackground(statBuoyBgOpacity); });
+statBuoyBgOpacity.addEventListener('mousedown', saveStateToHistory);
+statBuoyRadiusInput.addEventListener('input', () => { saveStateToHistory(); applyStyle('buoyRadius', statBuoyRadiusInput.value); });
+statBuoyBgResetBtn.addEventListener('click', () => { saveStateToHistory(); applyStyle('buoyBg', null); statBuoyBgPicker.value = '#1f2937'; });
 
 statMinVisible.addEventListener('change', () => { saveStateToHistory(); applyStyle('minVisible', statMinVisible.checked); });
 statMinIcon.addEventListener('change', () => { saveStateToHistory(); applyStyle('minIcon', statMinIcon.value); });
@@ -663,12 +742,13 @@ function generateCards() {
                 pointsHTML += `</div>`;
             }
 
-            // Blank cards render with no content — just the bg/overlay layers and action buttons
+            // Blank cards render with just bg/overlay layers, action buttons, and image placeholder
             if (type === 'Blank') {
                 cardEl.innerHTML = `
                     <div class="card-bg-layer"></div>
                     <div class="card-overlay-layer"></div>
                     ${actionBtnsHTML}
+                    <div class="card-image-placeholder">Click to add illustration</div>
                 `;
             } else {
                 cardEl.innerHTML = `
@@ -855,14 +935,12 @@ function generateCards() {
                 if (e.target.classList.contains('delete-card-btn')) {
                     const rowIdx = parseInt(e.target.dataset.index, 10);
                     if (!isNaN(rowIdx)) {
-                        if (confirm(`Are you sure you want to delete this card?`)) {
-                            parsedCsvData.splice(rowIdx, 1);
-
-                            setTimeout(() => {
-                                generateCards();
-                                triggerAutoSave();
-                            }, 10);
-                        }
+                        saveStateToHistory(); // Allows Ctrl+Z to recover an accidental delete
+                        parsedCsvData.splice(rowIdx, 1);
+                        setTimeout(() => {
+                            generateCards();
+                            triggerAutoSave();
+                        }, 10);
                         return;
                     }
                 }
@@ -909,6 +987,9 @@ function generateCards() {
 
                 // Ignore clicks on images or custom texts so we don't interrupt uploads/drags
                 if (e.target.closest('.card-image-placeholder') || e.target.closest('.custom-text-element')) return;
+
+                // Clicking the card background clears any element multi-selection
+                clearCtxSelection();
 
                 // Select this exact card in the dropdown
                 selectCardTarget(sysId);
@@ -1154,6 +1235,9 @@ function updateControlsToMatchCategory() {
         if (statBuoySize) statBuoySize.value = styles.buoySize || '1.1';
         if (statBuoyColor) statBuoyColor.value = styles.buoyColor || '#ffffff';
         if (document.getElementById('statBuoyColorText')) document.getElementById('statBuoyColorText').value = styles.buoyColor || '#ffffff';
+        if (statBuoyBgPicker) statBuoyBgPicker.value = styles.buoyBg || '#1f2937';
+        if (statBuoyBgOpacity) { statBuoyBgOpacity.value = styles.buoyBgOpacity !== undefined ? styles.buoyBgOpacity : '1'; updateSliderBackground(statBuoyBgOpacity); }
+        if (statBuoyRadiusInput) statBuoyRadiusInput.value = styles.buoyRadius !== undefined ? styles.buoyRadius : '2';
 
         if (statMinVisible) statMinVisible.checked = (styles.minVisible !== undefined) ? styles.minVisible : true;
         if (statMinIcon) statMinIcon.value = styles.minIcon || 'diamond';
@@ -1353,6 +1437,26 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
     }
     if (propName === 'buoySize') cardDiv.style.setProperty('--stat-buoy-size', `${value}em`);
     if (propName === 'buoyColor') cardDiv.style.setProperty('--stat-buoy-color', value);
+    if (propName === 'buoyBg') {
+        if (!value) {
+            cardDiv.style.removeProperty('--stat-buoy-bg');
+            cardDiv.dataset.buoyBg = '';
+        } else {
+            cardDiv.dataset.buoyBg = value;
+            const opacity = cardDiv.dataset.buoyBgOpacity ?? '1';
+            const rgb = hexToRgb(value);
+            if (rgb) cardDiv.style.setProperty('--stat-buoy-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`);
+        }
+    }
+    if (propName === 'buoyBgOpacity') {
+        cardDiv.dataset.buoyBgOpacity = value;
+        const hex = cardDiv.dataset.buoyBg;
+        if (hex) {
+            const rgb = hexToRgb(hex);
+            if (rgb) cardDiv.style.setProperty('--stat-buoy-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${value})`);
+        }
+    }
+    if (propName === 'buoyRadius') cardDiv.style.setProperty('--stat-buoy-radius', `${value}px`);
 
     if (propName === 'minVisible') cardDiv.style.setProperty('--stat-min-display', value ? 'flex' : 'none');
     if (propName === 'minIcon') {
@@ -1372,54 +1476,56 @@ function updateCSSCustomProperty(cardDiv, propName, value) {
 }
 
 function applyStoredStyles(cardDiv, category, title) {
-    const isBackside = category.startsWith('Back_');
     const sysId = title;
 
     // INFERENCE LOGIC: Check siblings if we have NO specific styling yet
+    // Backside cards manage their own copies via the JSON preset — skip inference entirely.
+    const isBackside = category.startsWith('Back_');
     if (!categoryStyles["card_" + sysId] && !isBackside && parsedCsvData && parsedCsvData.length > 0) {
+        // Frontside cards with no stored styles: use sibling inference
         const siblings = [];
-        const tempCounts = {};
+            const tempCounts = {};
 
-        parsedCsvData.forEach(row => {
-            const rType = row.Card_Type ? row.Card_Type.trim() : 'Uncategorized';
-            const rFallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
-            const rTitle = row.Card_Title ? row.Card_Title.trim() : rFallback;
+            parsedCsvData.forEach(row => {
+                const rType = row.Card_Type ? row.Card_Type.trim() : 'Uncategorized';
+                const rFallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
+                const rTitle = row.Card_Title ? row.Card_Title.trim() : rFallback;
 
-            let qty = parseInt(row.Qty, 10);
-            if (isNaN(qty) || qty < 1) qty = 1;
+                let qty = parseInt(row.Qty, 10);
+                if (isNaN(qty) || qty < 1) qty = 1;
 
-            for (let q = 0; q < qty; q++) {
-                if (!tempCounts[rTitle]) tempCounts[rTitle] = 0;
-                tempCounts[rTitle]++;
-                const cNum = tempCounts[rTitle];
-                const generatedSysId = cNum > 1 ? `${rTitle}__copy${cNum}` : rTitle;
+                for (let q = 0; q < qty; q++) {
+                    if (!tempCounts[rTitle]) tempCounts[rTitle] = 0;
+                    tempCounts[rTitle]++;
+                    const cNum = tempCounts[rTitle];
+                    const generatedSysId = cNum > 1 ? `${rTitle}__copy${cNum}` : rTitle;
 
-                if (rType === category) {
-                    siblings.push(generatedSysId);
+                    if (rType === category) {
+                        siblings.push(generatedSysId);
+                    }
+                }
+            });
+
+            const reversedSiblings = [...siblings].reverse();
+            let chosenSiblingStyle = null;
+
+            for (let sibSysId of reversedSiblings) {
+                if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
+                    chosenSiblingStyle = categoryStyles["card_" + sibSysId];
+                    break;
                 }
             }
-        });
 
-        const reversedSiblings = [...siblings].reverse();
-        let chosenSiblingStyle = null;
-
-        for (let sibSysId of reversedSiblings) {
-            if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
-                chosenSiblingStyle = categoryStyles["card_" + sibSysId];
-                break;
+            if (chosenSiblingStyle) {
+                const baseCard = JSON.parse(JSON.stringify(chosenSiblingStyle));
+                if (baseCard.fgImage) baseCard.fgImage = 'none';
+                if (baseCard.customTexts) {
+                    baseCard.customTexts.forEach(txt => {
+                        txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                    });
+                }
+                categoryStyles["card_" + sysId] = baseCard;
             }
-        }
-
-        if (chosenSiblingStyle) {
-            const baseCard = JSON.parse(JSON.stringify(chosenSiblingStyle));
-            if (baseCard.fgImage) baseCard.fgImage = 'none';
-            if (baseCard.customTexts) {
-                baseCard.customTexts.forEach(txt => {
-                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
-                });
-            }
-            categoryStyles["card_" + sysId] = baseCard;
-        }
     }
 
     const styles = getEffectiveStyles("card_" + sysId, category);
@@ -1446,6 +1552,9 @@ function applyStoredStyles(cardDiv, category, title) {
     updateCSSCustomProperty(cardDiv, 'mechanicBgColor', styles.mechanicBgColor !== undefined ? styles.mechanicBgColor : '#000000');
     updateCSSCustomProperty(cardDiv, 'mechanicBgOpacity', styles.mechanicBgOpacity !== undefined ? styles.mechanicBgOpacity : '0.04');
     updateCSSCustomProperty(cardDiv, 'showBuoy', (styles.showBuoy !== undefined) ? styles.showBuoy : true);
+    updateCSSCustomProperty(cardDiv, 'buoyBg', styles.buoyBg || null);
+    updateCSSCustomProperty(cardDiv, 'buoyBgOpacity', styles.buoyBgOpacity !== undefined ? styles.buoyBgOpacity : '1');
+    updateCSSCustomProperty(cardDiv, 'buoyRadius', styles.buoyRadius !== undefined ? styles.buoyRadius : '2');
 
     // Handle Custom Texts
     const existingTexts = cardDiv.querySelectorAll('.custom-text-element');
@@ -1462,13 +1571,30 @@ function applyStoredStyles(cardDiv, category, title) {
         if (txt.font && txt.font !== 'inherit') wrapper.style.fontFamily = txt.font;
         if (txt.size) wrapper.style.fontSize = txt.size + 'rem';
         if (txt.color) wrapper.style.color = txt.color;
-        if (txt.bg) wrapper.style.backgroundColor = txt.bg;
         if (txt.bold) wrapper.style.fontWeight = 'bold';
         else wrapper.style.fontWeight = '600';
+        if (txt.boxWidth) wrapper.style.width = txt.boxWidth + 'px';
+        if (txt.boxHeight) wrapper.style.height = txt.boxHeight + 'px';
+
+        const backdropDiv = document.createElement('div');
+        backdropDiv.className = 'custom-backdrop';
+        if (txt.bg && txt.bg !== 'transparent') {
+            const rgb = hexToRgb(txt.bg);
+            const opacity = txt.bgOpacity !== undefined ? txt.bgOpacity : 1;
+            backdropDiv.style.backgroundColor = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${opacity})` : txt.bg;
+        }
+        if (txt.borderRadius) backdropDiv.style.borderRadius = txt.borderRadius + 'px';
+        wrapper.appendChild(backdropDiv);
 
         const contentSpan = document.createElement('span');
-        contentSpan.className = 'custom-text-content';
-        contentSpan.innerText = txt.text;
+        if (txt.type === 'icon') {
+            contentSpan.className = 'material-icons custom-icon-content';
+            contentSpan.textContent = txt.text;
+            if (txt.stroke) contentSpan.style.webkitTextStroke = txt.stroke + 'px currentColor';
+        } else {
+            contentSpan.className = 'custom-text-content';
+            contentSpan.innerText = txt.text;
+        }
 
         if (txt.width) contentSpan.style.width = txt.width;
         if (txt.height) contentSpan.style.height = txt.height;
@@ -1541,14 +1667,20 @@ function parseCardText(str) {
     const result = [];
     let listBuffer = [];
     let listType = null; // 'ul' or 'ol'
+    let olCounter = 1; // tracks the running number for ordered lists across blank-line gaps
 
-    const flushList = () => {
+    const flushList = (resetOl = false) => {
         if (listBuffer.length > 0) {
-            const tag = listType === 'ol' ? 'ol' : 'ul';
-            result.push(`<${tag} class="card-text-list">${listBuffer.map(i => `<li>${i}</li>`).join('')}</${tag}>`);
+            if (listType === 'ol') {
+                result.push(`<ol class="card-text-list" start="${olCounter}">${listBuffer.map(i => `<li>${i}</li>`).join('')}</ol>`);
+                olCounter += listBuffer.length;
+            } else {
+                result.push(`<ul class="card-text-list">${listBuffer.map(i => `<li>${i}</li>`).join('')}</ul>`);
+            }
             listBuffer = [];
             listType = null;
         }
+        if (resetOl) olCounter = 1;
     };
 
     const inline = str => applyInline(escapeHTML(str));
@@ -1557,34 +1689,34 @@ function parseCardText(str) {
         const trimmed = rawLine.trim();
 
         if (trimmed === '') {
-            flushList();
+            flushList(); // blank line preserves olCounter so gaps between items don't reset numbering
             result.push('<div class="card-text-gap"></div>');
         } else if (trimmed === '---') {
-            flushList();
+            flushList(true);
             result.push('<hr class="card-text-divider">');
         } else if (/^\[gap:[^\]]+\]$/.test(trimmed)) {
-            flushList();
+            flushList(); // gap tag also preserves numbering
             const size = escapeHTML(trimmed.match(/^\[gap:([^\]]+)\]$/)[1]);
             result.push(`<div class="card-text-gap" style="height:${size}"></div>`);
         } else if (/^####/.test(trimmed)) {
-            flushList();
+            flushList(true);
             result.push(`<span class="card-text-h4">${inline(trimmed.replace(/^####\s*/, ''))}</span>`);
         } else if (/^###/.test(trimmed)) {
-            flushList();
+            flushList(true);
             result.push(`<span class="card-text-h3">${inline(trimmed.replace(/^###\s*/, ''))}</span>`);
         } else if (/^##/.test(trimmed)) {
-            flushList();
+            flushList(true);
             result.push(`<span class="card-text-h2">${inline(trimmed.replace(/^##\s*/, ''))}</span>`);
         } else if (/^[-*] /.test(trimmed)) {
-            if (listType === 'ol') flushList();
+            if (listType === 'ol') flushList(true);
             listType = 'ul';
             listBuffer.push(inline(trimmed.slice(2)));
         } else if (/^\d+[.)]\s/.test(trimmed)) {
-            if (listType === 'ul') flushList();
+            if (listType === 'ul') flushList(true);
             listType = 'ol';
             listBuffer.push(inline(trimmed.replace(/^\d+[.)]\s/, '')));
         } else {
-            flushList();
+            flushList(true);
             result.push(`<span class="card-text-p">${inline(rawLine)}</span>`);
         }
     });
@@ -1596,8 +1728,6 @@ function parseCardText(str) {
 // --- Illustration overflow detection ---
 // When a card's body text exceeds the available space (after the fixed-height
 // illustration), we hide the illustration so the body can expand to fill the card.
-
-let _illustrationCheckTimer = null;
 
 function scheduleIllustrationCheck() {
     clearTimeout(_illustrationCheckTimer);
@@ -1668,10 +1798,70 @@ function handleAddCustomText() {
     });
 }
 
+function handleAddCustomIcon(iconName) {
+    saveStateToHistory();
+    const target = targetCategory.value;
+    const newIcon = { id: 'ctx_' + Date.now(), text: iconName, type: 'icon', x: 50, y: 50 };
+
+    if (!categoryStyles[target]) categoryStyles[target] = {};
+    if (!categoryStyles[target].customTexts) {
+        const effective = getEffectiveStyles(target);
+        categoryStyles[target].customTexts = effective.customTexts ? JSON.parse(JSON.stringify(effective.customTexts)) : [];
+        categoryStyles[target].customTexts.forEach(t => {
+            t.id = 'ctx_' + Date.now().toString() + Math.random().toString(36).substring(2, 11);
+        });
+    }
+    categoryStyles[target].customTexts.push(newIcon);
+
+    if (target === 'all') {
+        Object.keys(categoryStyles).forEach(key => {
+            if (key !== 'all' && !key.includes('_Back_')) {
+                if (!categoryStyles[key].customTexts) categoryStyles[key].customTexts = [];
+                categoryStyles[key].customTexts.push({ ...newIcon });
+            }
+        });
+    } else if (target.startsWith('cat_')) {
+        const catName = target.substring(4);
+        document.querySelectorAll('.game-card').forEach(card => {
+            if (card.dataset.category === catName) {
+                const cardKey = 'card_' + card.dataset.sysId;
+                if (categoryStyles[cardKey]) {
+                    if (!categoryStyles[cardKey].customTexts) categoryStyles[cardKey].customTexts = [];
+                    if (!categoryStyles[cardKey].customTexts.find(t => t.id === newIcon.id)) {
+                        categoryStyles[cardKey].customTexts.push({ ...newIcon });
+                    }
+                }
+            }
+        });
+    }
+
+    document.querySelectorAll('.game-card').forEach(card => {
+        applyStoredStyles(card, card.dataset.category, card.dataset.sysId);
+    });
+}
+
 function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn) {
     let isDragging = false;
 
     wrapper.addEventListener('mousedown', (e) => {
+        // Shift+click: toggle this element in the multi-selection
+        if (e.shiftKey) {
+            e.stopPropagation();
+            if (selectedCtxIds.has(txtId)) {
+                selectedCtxIds.delete(txtId);
+                wrapper.classList.remove('is-selected');
+            } else {
+                selectedCtxIds.add(txtId);
+                wrapper.classList.add('is-selected');
+            }
+            return;
+        }
+
+        // Regular click: clear multi-selection, select just this one
+        clearCtxSelection();
+        selectedCtxIds.add(txtId);
+        wrapper.classList.add('is-selected');
+
         saveStateToHistory();
         // Show properties on single click without entering typing mode
         if (activeCtxId !== txtId) {
@@ -1748,6 +1938,7 @@ function attachCustomTextEvents(wrapper, cardDiv, txtId, contentSpan, deleteBtn)
     });
 
     wrapper.addEventListener('dblclick', (e) => {
+        if (contentSpan.classList.contains('custom-icon-content')) return;
         contentSpan.contentEditable = true;
         wrapper.classList.add('is-editing');
         contentSpan.focus();
@@ -1915,7 +2106,14 @@ const ctxSizeInput = document.getElementById('ctxSizeInput');
 const ctxBoldToggle = document.getElementById('ctxBoldToggle');
 const ctxColorPicker = document.getElementById('ctxColorPicker');
 const ctxBgPicker = document.getElementById('ctxBgPicker');
+const ctxBgOpacitySlider = document.getElementById('ctxBgOpacitySlider');
 const ctxClearBgBtn = document.getElementById('ctxClearBgBtn');
+const ctxBorderRadiusInput = document.getElementById('ctxBorderRadiusInput');
+const ctxBoxWidthInput = document.getElementById('ctxBoxWidthInput');
+const ctxBoxHeightInput = document.getElementById('ctxBoxHeightInput');
+const ctxStrokeInput = document.getElementById('ctxStrokeInput');
+const ctxTextOnlyFields = document.getElementById('ctxTextOnlyFields');
+const ctxIconOnlyFields = document.getElementById('ctxIconOnlyFields');
 
 let activeCtxId = null;
 let activeCtxWrapper = null;
@@ -1958,6 +2156,10 @@ function showCtxToolbar(wrapper, id) {
         txtData = searchTarget.customTexts.find(t => t.id === id);
     }
 
+    const isIcon = !!wrapper.querySelector('.custom-icon-content');
+    ctxTextOnlyFields.style.display = isIcon ? 'none' : '';
+    ctxIconOnlyFields.style.display = isIcon ? '' : 'none';
+
     if (txtData) {
         ctxFontSelect.value = txtData.font || 'inherit';
         ctxSizeInput.value = txtData.size || 1;
@@ -1965,6 +2167,12 @@ function showCtxToolbar(wrapper, id) {
         ctxColorPicker.value = txtData.color || '#111827';
         // HTML Color inputs only support 6-character hex
         ctxBgPicker.value = (txtData.bg && txtData.bg !== 'transparent') ? txtData.bg : '#ffffff';
+        ctxBgOpacitySlider.value = txtData.bgOpacity !== undefined ? txtData.bgOpacity : (txtData.bg && txtData.bg !== 'transparent' ? 1 : 0);
+        updateSliderBackground(ctxBgOpacitySlider);
+        ctxBorderRadiusInput.value = txtData.borderRadius || 0;
+        ctxBoxWidthInput.value = txtData.boxWidth || '';
+        ctxBoxHeightInput.value = txtData.boxHeight || '';
+        ctxStrokeInput.value = txtData.stroke || 0;
     }
 
     customTextToolbar.style.display = 'flex';
@@ -2002,13 +2210,58 @@ ctxColorPicker.addEventListener('input', () => {
 });
 ctxBgPicker.addEventListener('input', () => {
     if (!activeCtxId) return;
-    updateCustomTextDataStore(activeCtxId, { bg: ctxBgPicker.value });
-    activeCtxWrapper.style.backgroundColor = ctxBgPicker.value;
+    const opacity = ctxBgOpacitySlider.value;
+    updateCustomTextDataStore(activeCtxId, { bg: ctxBgPicker.value, bgOpacity: opacity });
+    const rgb = hexToRgb(ctxBgPicker.value);
+    const backdrop = activeCtxWrapper.querySelector('.custom-backdrop');
+    if (backdrop) backdrop.style.backgroundColor = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${opacity})` : ctxBgPicker.value;
+});
+ctxBgOpacitySlider.addEventListener('mousedown', saveStateToHistory);
+ctxBgOpacitySlider.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    const opacity = ctxBgOpacitySlider.value;
+    updateCustomTextDataStore(activeCtxId, { bgOpacity: opacity });
+    const rgb = hexToRgb(ctxBgPicker.value);
+    const backdrop = activeCtxWrapper.querySelector('.custom-backdrop');
+    if (backdrop) backdrop.style.backgroundColor = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${opacity})` : '';
+    updateSliderBackground(ctxBgOpacitySlider);
 });
 ctxClearBgBtn.addEventListener('click', () => {
     if (!activeCtxId) return;
-    updateCustomTextDataStore(activeCtxId, { bg: 'transparent' });
-    activeCtxWrapper.style.backgroundColor = 'transparent';
+    updateCustomTextDataStore(activeCtxId, { bg: 'transparent', bgOpacity: 0 });
+    ctxBgOpacitySlider.value = 0;
+    updateSliderBackground(ctxBgOpacitySlider);
+    const backdrop = activeCtxWrapper.querySelector('.custom-backdrop');
+    if (backdrop) backdrop.style.backgroundColor = '';
+});
+ctxBorderRadiusInput.addEventListener('mousedown', saveStateToHistory);
+ctxBorderRadiusInput.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    const r = ctxBorderRadiusInput.value + 'px';
+    updateCustomTextDataStore(activeCtxId, { borderRadius: ctxBorderRadiusInput.value });
+    const backdrop = activeCtxWrapper.querySelector('.custom-backdrop');
+    if (backdrop) backdrop.style.borderRadius = r;
+});
+ctxStrokeInput.addEventListener('mousedown', saveStateToHistory);
+ctxStrokeInput.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    updateCustomTextDataStore(activeCtxId, { stroke: ctxStrokeInput.value });
+    const iconSpan = activeCtxWrapper.querySelector('.custom-icon-content');
+    if (iconSpan) iconSpan.style.webkitTextStroke = ctxStrokeInput.value + 'px currentColor';
+});
+ctxBoxWidthInput.addEventListener('mousedown', saveStateToHistory);
+ctxBoxWidthInput.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    const val = ctxBoxWidthInput.value;
+    updateCustomTextDataStore(activeCtxId, { boxWidth: val });
+    activeCtxWrapper.style.width = val ? val + 'px' : '';
+});
+ctxBoxHeightInput.addEventListener('mousedown', saveStateToHistory);
+ctxBoxHeightInput.addEventListener('input', () => {
+    if (!activeCtxId) return;
+    const val = ctxBoxHeightInput.value;
+    updateCustomTextDataStore(activeCtxId, { boxHeight: val });
+    activeCtxWrapper.style.height = val ? val + 'px' : '';
 });
 
 function syncCustomTextContentUI(id, newText) {
@@ -2293,7 +2546,7 @@ function loadPresetData(data) {
         backsideMappings = data.mappings ? JSON.parse(JSON.stringify(data.mappings)) : {};
         if (data.deck && data.deck.length > 0) {
             if (parsedCsvData && parsedCsvData.length > 0) {
-                if (confirm("This preset contains its own saved cards (including your manual duplicates).\n\nPress OK to load these saved cards AND automatically append any brand new cards from your current CSV.\nPress Cancel to KEEP your current CSV sequence completely and just apply the layout styles.")) {
+                if (confirm("This preset contains your saved deck layout (duplicates, blank cards, background cards, custom images, custom text).\n\n✅ OK  → RECOMMENDED: Restore full deck layout and refresh text from your current CSV\n\n❌ Cancel → DESTRUCTIVE: Apply styles only using the raw CSV — your duplicates, blank cards, and background cards will all be LOST")) {
                     shouldMergeDeck = true;
                 }
             } else {
@@ -2309,22 +2562,25 @@ function loadPresetData(data) {
     if (shouldMergeDeck && data.deck) {
         const oldDeck = JSON.parse(JSON.stringify(data.deck));
 
-        // Build a lookup of the freshly parsed CSV data by Card_Title
-        // We assume the user just loaded a new CSV with cool new text
+        // Build a lookup of the freshly parsed CSV data.
+        // Key = Card_Title if non-empty, else Card_ID — handles backside cards that
+        // have no title but have unique IDs (BEP-001, BMP-001, etc.)
+        const deckKey = row => ((row.Card_Title || '').trim() || (row.Card_ID || '').trim());
         const freshCsvDict = {};
         if (parsedCsvData) {
             parsedCsvData.forEach(row => {
-                freshCsvDict[row.Card_Title] = row;
+                freshCsvDict[deckKey(row)] = row;
             });
         }
 
         const mergedDeck = [];
-        const oldTitles = new Set();
+        const mergedKeys = new Set();
 
         // 1. Iterate through the old structural deck (which holds manual duplicates!)
         oldDeck.forEach(oldRow => {
-            oldTitles.add(oldRow.Card_Title);
-            const freshData = freshCsvDict[oldRow.Card_Title];
+            const key = deckKey(oldRow);
+            mergedKeys.add(key);
+            const freshData = freshCsvDict[key];
 
             if (freshData) {
                 // Merge: Keep the old structural properties (Qty) but overwrite with the fresh textual data
@@ -2340,7 +2596,7 @@ function loadPresetData(data) {
         // 2. Append brand new cards from the CSV that were NOT in the old deck
         let brandNewCards = [];
         if (parsedCsvData) {
-            brandNewCards = parsedCsvData.filter(row => !oldTitles.has(row.Card_Title));
+            brandNewCards = parsedCsvData.filter(row => !mergedKeys.has(deckKey(row)));
         }
 
         parsedCsvData = [...mergedDeck, ...brandNewCards];
@@ -2481,24 +2737,24 @@ async function handleImportPreset(event) {
             const importedData = JSON.parse(e.target.result);
             const stylesToProcess = importedData.styles ? importedData.styles : importedData;
 
-            // ── STEP 1: Make ALL user decisions SYNCHRONOUSLY before any await ──
-            // (browsers suppress alert/confirm after async context is lost)
-
-            // Decide how to handle the saved deck structure
+            // Decide how to handle the saved deck structure.
+            // Always merge if JSON has a deck — this restores duplicates, blank cards, etc.
+            // No confirm needed: if you imported a preset JSON, you always want the full layout back.
             let shouldMergeDeck = false;
             let shouldOverwriteDeck = false;
 
             if (importedData.deck && importedData.deck.length > 0) {
                 if (parsedCsvData && parsedCsvData.length > 0) {
-                    shouldMergeDeck = confirm(
-                        "This preset contains saved cards (including duplicates and blank cards).\n\n" +
-                        "OK  → Load the preset's saved cards and merge with your current CSV\n" +
-                        "Cancel → Keep your current card list and only apply the styles"
-                    );
+                    shouldMergeDeck = true;
                 } else {
                     shouldOverwriteDeck = true;
                 }
             }
+
+            // ── STEP 1: Ask about saving to local presets ──
+            // Wait briefly so the file picker fully closes and the browser restores
+            // window focus — otherwise Chrome auto-dismisses confirm() dialogs.
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             // Decide if user wants to save to local presets
             let saveToLocal = false;
@@ -2621,21 +2877,25 @@ async function handleImportPreset(event) {
             if (shouldMergeDeck && importedData.deck) {
                 // Merge: preserve preset's deck structure (duplicates, blank cards) while
                 // pulling fresh text/data from the current CSV for matching titles.
+                // Key = Card_Title if non-empty, else Card_ID — handles backside cards that
+                // have no title but have unique IDs (BEP-001, BMP-001, etc.)
+                const deckKey = row => ((row.Card_Title || '').trim() || (row.Card_ID || '').trim());
                 const freshCsvDict = {};
-                if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[row.Card_Title] = row; });
+                if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[deckKey(row)] = row; });
 
                 const mergedDeck = [];
-                const oldTitles = new Set();
+                const mergedKeys = new Set();
                 importedData.deck.forEach(oldRow => {
-                    oldTitles.add(oldRow.Card_Title);
-                    const freshData = freshCsvDict[oldRow.Card_Title];
+                    const key = deckKey(oldRow);
+                    mergedKeys.add(key);
+                    const freshData = freshCsvDict[key];
                     // Blank cards and cards not in current CSV fall back to the saved row as-is
                     mergedDeck.push(freshData ? { ...freshData, Qty: oldRow.Qty } : oldRow);
                 });
 
                 // Append brand-new CSV cards not present in the saved deck
                 if (parsedCsvData) {
-                    parsedCsvData.filter(row => !oldTitles.has(row.Card_Title)).forEach(row => mergedDeck.push(row));
+                    parsedCsvData.filter(row => !mergedKeys.has(deckKey(row))).forEach(row => mergedDeck.push(row));
                 }
 
                 parsedCsvData = mergedDeck;
