@@ -654,6 +654,18 @@ button:disabled {
     border-radius: inherit;
 }
 
+/* Blank cards also get full-card illustrations */
+.game-card.is-blank .card-image-placeholder {
+    height: 100%;
+    margin: 0;
+    border-radius: inherit;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 2;
+}
+
 /* Texture Layer (Bottom) */
 .card-bg-layer {
     position: absolute;
@@ -1177,6 +1189,12 @@ ol.card-text-list {
 
     .print-layout {
         display: block !important;
+    }
+
+    /* Hide placeholder text on cards without illustrations */
+    .card-image-placeholder:not(.has-image) {
+        color: transparent !important;
+        background-color: transparent !important;
     }
 
     .print-page {

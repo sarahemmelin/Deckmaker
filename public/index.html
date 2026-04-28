@@ -30,8 +30,12 @@
                     Upload CSV Data
                     <input type="file" id="csvFileInput" accept=".csv" class="file-input">
                 </label>
+                <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-primary);">
+                    <input type="checkbox" id="mergeCsvToggle" title="Check this to update standard cards while keeping your custom cards">
+                    <label for="mergeCsvToggle" title="Check this to update standard cards while keeping your custom cards">Merge with current deck</label>
+                </div>
                 <div id="fileStatus" class="file-status">No file uploaded.</div>
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
                     <button id="generateBtn" class="primary-btn" style="flex: 2;" disabled>Generate Cards</button>
                     <button id="addBlankCardBtn" class="secondary-btn" style="flex: 1; padding: 0.5rem;"
                         title="Add an empty custom card to your deck">Add Blank</button>
