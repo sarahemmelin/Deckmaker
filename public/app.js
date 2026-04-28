@@ -601,7 +601,43 @@ function handleFileUpload(event) {
 
     const reader = new FileReader();
     reader.onload = function (e) {
-        parsedCsvData = parseCSV(e.target.result);
+        const newCsvDeck = parseCSV(e.target.result);
+        const mergeToggle = document.getElementById('mergeCsvToggle');
+
+        if (mergeToggle && mergeToggle.checked && parsedCsvData && parsedCsvData.length > 0) {
+            // SAFE MERGE LOGIC: Never delete user cards!
+            let addedCount = 0;
+            let updatedCount = 0;
+
+            newCsvDeck.forEach(csvCard => {
+                const csvId = csvCard.Card_ID ? csvCard.Card_ID.trim() : '';
+                const csvTitle = csvCard.Card_Title ? csvCard.Card_Title.trim() : 'Untitled';
+
+                // Find matching card in current deck
+                const existingIndex = parsedCsvData.findIndex(oldCard => {
+                    const oldId = oldCard.Card_ID ? oldCard.Card_ID.trim() : '';
+                    if (csvId && oldId) return csvId === oldId;
+
+                    const oldTitle = oldCard.Card_Title ? oldCard.Card_Title.trim() : 'Untitled';
+                    return csvTitle === oldTitle;
+                });
+
+                if (existingIndex !== -1) {
+                    // Update existing
+                    parsedCsvData[existingIndex] = { ...parsedCsvData[existingIndex], ...csvCard };
+                    updatedCount++;
+                } else {
+                    // Add new missing card
+                    parsedCsvData.push({ ...csvCard });
+                    addedCount++;
+                }
+            });
+
+            alert(`Merged Safely! Updated ${updatedCount} existing cards and added ${addedCount} new cards. All your custom copies (like event backgrounds) were preserved!`);
+        } else {
+            // STANDARD OVERWRITE LOGIC
+            parsedCsvData = newCsvDeck;
+        }
 
         if (parsedCsvData && parsedCsvData.length > 0) {
             generateBtn.disabled = false;
@@ -654,10 +690,22 @@ function parseCSV(text) {
 
     for (let i = 1; i < rows.length; i++) {
         if (rows[i].length === 1 && rows[i][0].trim() === '') continue;
+
         const rowObj = {};
+        let hasMeaningfulData = false;
+
         for (let j = 0; j < headers.length; j++) {
-            rowObj[headers[j]] = rows[i][j] ? rows[i][j].trim() : '';
+            const val = rows[i][j] ? rows[i][j].trim() : '';
+            const header = headers[j];
+            rowObj[header] = val;
+
+            if (header !== 'Qty' && header !== '' && val !== '') {
+                hasMeaningfulData = true;
+            }
         }
+
+        if (!hasMeaningfulData) continue;
+
         data.push(rowObj);
     }
     return data;
@@ -669,11 +717,30 @@ function parseCSV(text) {
 function generateCards() {
     if (!parsedCsvData || parsedCsvData.length === 0) return;
 
+    // Cache existing DOM categories before clearing, to detect category changes
+    const oldCategories = {};
+    document.querySelectorAll('.game-card').forEach(card => {
+        oldCategories[card.dataset.sysId] = card.dataset.category;
+    });
+
     cardGrid.innerHTML = '';
     cardCategories.clear();
     cardTitles.clear();
     let totalCardsGenerated = 0;
     const titleCounts = {};
+
+    // Sort cards by Category (Card_Type), then by Card_ID for clean visual grouping
+    parsedCsvData.sort((a, b) => {
+        const typeA = a.Card_Type ? a.Card_Type.trim() : 'Uncategorized';
+        const typeB = b.Card_Type ? b.Card_Type.trim() : 'Uncategorized';
+
+        if (typeA === typeB) {
+            const idA = a.Card_ID ? a.Card_ID.trim() : '';
+            const idB = b.Card_ID ? b.Card_ID.trim() : '';
+            return idA.localeCompare(idB);
+        }
+        return typeA.localeCompare(typeB);
+    });
 
     parsedCsvData.forEach(rowData => {
         // Track unique Card_Types for the Styling dropdown
@@ -695,6 +762,13 @@ function generateCards() {
             const sysId = copyNum > 1 ? `${title}__copy${copyNum}` : title;
             cardTitles.add(sysId);
 
+            // If a card's category changed from what it was previously, wipe its specific styles 
+            // so it can inherit the styles of its new category.
+            const oldCat = oldCategories[sysId];
+            if (oldCat && oldCat !== type) {
+                delete categoryStyles["card_" + sysId];
+            }
+
             const cardEl = document.createElement('div');
             cardEl.className = 'game-card';
             if (type.startsWith('Back_')) {
@@ -708,7 +782,7 @@ function generateCards() {
             let badgesHTML = '';
             // We consistently inject the badge html if there's data, and let 'display: flex|none' 
             // from the CSS toggle it dynamically from the Styling Panel so sizing doesn't break.
-            if (rowData.Buoy_Mod) {
+            if (rowData.Buoy_Mod && rowData.Buoy_Mod.trim() !== "0") {
                 badgesHTML += `<div class="stat-badge buoy-badge" style="display: flex; align-items: center; gap: 4px;">
                     <span class="material-icons" style="font-size: 1.1em;">arrow_downward</span> 
                     <span>${escapeHTML(rowData.Buoy_Mod)}</span>
@@ -744,6 +818,7 @@ function generateCards() {
 
             // Blank cards render with just bg/overlay layers, action buttons, and image placeholder
             if (type === 'Blank') {
+                cardEl.classList.add('is-blank');
                 cardEl.innerHTML = `
                     <div class="card-bg-layer"></div>
                     <div class="card-overlay-layer"></div>
@@ -1066,7 +1141,7 @@ async function handleImageSelection(event) {
                 const targetKey = "card_" + targetTitle;
 
                 if (!categoryStyles[targetKey]) {
-                    categoryStyles[targetKey] = JSON.parse(JSON.stringify(categoryStyles["all"]));
+                    categoryStyles[targetKey] = {};
                 }
                 categoryStyles[targetKey].fgImage = `url('${data.url}')`;
                 resetPresetButtons();
@@ -1484,48 +1559,48 @@ function applyStoredStyles(cardDiv, category, title) {
     if (!categoryStyles["card_" + sysId] && !isBackside && parsedCsvData && parsedCsvData.length > 0) {
         // Frontside cards with no stored styles: use sibling inference
         const siblings = [];
-            const tempCounts = {};
+        const tempCounts = {};
 
-            parsedCsvData.forEach(row => {
-                const rType = row.Card_Type ? row.Card_Type.trim() : 'Uncategorized';
-                const rFallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
-                const rTitle = row.Card_Title ? row.Card_Title.trim() : rFallback;
+        parsedCsvData.forEach(row => {
+            const rType = row.Card_Type ? row.Card_Type.trim() : 'Uncategorized';
+            const rFallback = row.Card_ID ? row.Card_ID.trim() : 'Untitled';
+            const rTitle = row.Card_Title ? row.Card_Title.trim() : rFallback;
 
-                let qty = parseInt(row.Qty, 10);
-                if (isNaN(qty) || qty < 1) qty = 1;
+            let qty = parseInt(row.Qty, 10);
+            if (isNaN(qty) || qty < 1) qty = 1;
 
-                for (let q = 0; q < qty; q++) {
-                    if (!tempCounts[rTitle]) tempCounts[rTitle] = 0;
-                    tempCounts[rTitle]++;
-                    const cNum = tempCounts[rTitle];
-                    const generatedSysId = cNum > 1 ? `${rTitle}__copy${cNum}` : rTitle;
+            for (let q = 0; q < qty; q++) {
+                if (!tempCounts[rTitle]) tempCounts[rTitle] = 0;
+                tempCounts[rTitle]++;
+                const cNum = tempCounts[rTitle];
+                const generatedSysId = cNum > 1 ? `${rTitle}__copy${cNum}` : rTitle;
 
-                    if (rType === category) {
-                        siblings.push(generatedSysId);
-                    }
-                }
-            });
-
-            const reversedSiblings = [...siblings].reverse();
-            let chosenSiblingStyle = null;
-
-            for (let sibSysId of reversedSiblings) {
-                if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
-                    chosenSiblingStyle = categoryStyles["card_" + sibSysId];
-                    break;
+                if (rType === category) {
+                    siblings.push(generatedSysId);
                 }
             }
+        });
 
-            if (chosenSiblingStyle) {
-                const baseCard = JSON.parse(JSON.stringify(chosenSiblingStyle));
-                if (baseCard.fgImage) baseCard.fgImage = 'none';
-                if (baseCard.customTexts) {
-                    baseCard.customTexts.forEach(txt => {
-                        txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
-                    });
-                }
-                categoryStyles["card_" + sysId] = baseCard;
+        const reversedSiblings = [...siblings].reverse();
+        let chosenSiblingStyle = null;
+
+        for (let sibSysId of reversedSiblings) {
+            if (sibSysId !== sysId && categoryStyles["card_" + sibSysId]) {
+                chosenSiblingStyle = categoryStyles["card_" + sibSysId];
+                break;
             }
+        }
+
+        if (chosenSiblingStyle) {
+            const baseCard = JSON.parse(JSON.stringify(chosenSiblingStyle));
+            if (baseCard.fgImage) baseCard.fgImage = 'none';
+            if (baseCard.customTexts) {
+                baseCard.customTexts.forEach(txt => {
+                    txt.id = 'ctx_' + Math.random().toString(36).substr(2, 9) + Date.now();
+                });
+            }
+            categoryStyles["card_" + sysId] = baseCard;
+        }
     }
 
     const styles = getEffectiveStyles("card_" + sysId, category);
@@ -2876,26 +2951,39 @@ async function handleImportPreset(event) {
 
             if (shouldMergeDeck && importedData.deck) {
                 // Merge: preserve preset's deck structure (duplicates, blank cards) while
-                // pulling fresh text/data from the current CSV for matching titles.
-                // Key = Card_Title if non-empty, else Card_ID — handles backside cards that
-                // have no title but have unique IDs (BEP-001, BMP-001, etc.)
-                const deckKey = row => ((row.Card_Title || '').trim() || (row.Card_ID || '').trim());
-                const freshCsvDict = {};
-                if (parsedCsvData) parsedCsvData.forEach(row => { freshCsvDict[deckKey(row)] = row; });
+                // pulling fresh text/data from the current CSV for matching Card_IDs.
+                // We match strictly by Card_ID to handle:
+                //   - Background copies (same Card_ID intentionally duplicated)
+                //   - Real/fake sample pairs (same title, different Card_ID)
+                const csvById = {};
+                if (parsedCsvData) parsedCsvData.forEach(row => {
+                    const id = (row.Card_ID || '').trim();
+                    if (id) csvById[id] = row;
+                });
 
                 const mergedDeck = [];
-                const mergedKeys = new Set();
+                const usedIds = new Set();
                 importedData.deck.forEach(oldRow => {
-                    const key = deckKey(oldRow);
-                    mergedKeys.add(key);
-                    const freshData = freshCsvDict[key];
-                    // Blank cards and cards not in current CSV fall back to the saved row as-is
-                    mergedDeck.push(freshData ? { ...freshData, Qty: oldRow.Qty } : oldRow);
+                    const id = (oldRow.Card_ID || '').trim();
+                    if (id && csvById[id] && !usedIds.has(id)) {
+                        // First match: update from CSV but keep preset's Qty
+                        mergedDeck.push({ ...csvById[id], Qty: oldRow.Qty });
+                        usedIds.add(id);
+                    } else {
+                        // Duplicate ID (background copy), blank card, or no CSV match:
+                        // keep the saved row exactly as-is
+                        mergedDeck.push(oldRow);
+                    }
                 });
 
                 // Append brand-new CSV cards not present in the saved deck
                 if (parsedCsvData) {
-                    parsedCsvData.filter(row => !mergedKeys.has(deckKey(row))).forEach(row => mergedDeck.push(row));
+                    parsedCsvData.forEach(row => {
+                        const id = (row.Card_ID || '').trim();
+                        if (id && !usedIds.has(id)) {
+                            mergedDeck.push(row);
+                        }
+                    });
                 }
 
                 parsedCsvData = mergedDeck;
